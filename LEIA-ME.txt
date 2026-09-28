@@ -1,0 +1,10 @@
+APLICATIVO: Croger Creator
+PACOTE: com.croger.creator
+
+CATEGORIAS:
+- Modelos
+- Projetos
+- Recursos
+
+Projeto criado automaticamente pelo Criador_APK.
+Ainda não compilado.

@@ -6,3 +6,8 @@ bin/
 main_console_backup.py
 main_console_original.py
 main_gui.py
+
+# Backups e testes locais do desenvolvimento
+teste_local/
+teste_novo_projeto/
+teste_motor.py

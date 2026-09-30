@@ -1,0 +1,3993 @@
+import json
+import unicodedata
+from pathlib import Path
+
+from kivy.app import App
+from kivy.metrics import dp
+
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.gridlayout import GridLayout
+from kivy.uix.button import Button
+from kivy.uix.label import Label
+from kivy.uix.popup import Popup
+from kivy.uix.textinput import TextInput
+
+
+NOME_APP = @@NOME_APP@@
+MODELO = @@MODELO@@
+MODULOS = @@MODULOS@@
+
+
+def obter_pasta_dados_app():
+    nome_pasta_app = "".join(
+        caractere
+        if caractere.isalnum()
+        else "_"
+        for caractere in NOME_APP
+    ).strip("_").lower()
+
+    pasta = (
+        Path(
+            App.get_running_app().user_data_dir
+        )
+        / nome_pasta_app
+    )
+
+    pasta.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    return pasta
+
+
+class BibliotecaApp(BoxLayout):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.orientation = "vertical"
+        self.spacing = dp(8)
+        self.padding = dp(10)
+
+        self.pasta_dados = (
+            obter_pasta_dados_app()
+        )
+
+        self.arquivo_categorias = (
+            self.pasta_dados
+            / "categorias.json"
+        )
+
+        self.arquivo_documentos = (
+            self.pasta_dados
+            / "documentos.json"
+        )
+
+        self.arquivo_imagens = (
+            self.pasta_dados
+            / "imagens.json"
+        )
+
+        self.arquivo_favoritos = (
+            self.pasta_dados
+            / "favoritos.json"
+        )
+
+        self.pagina_categorias = 0
+        self.pagina_documentos = 0
+        self.pagina_pdfs = 0
+        self.pagina_imagens = 0
+        self.pagina_pesquisa = 0
+        self.pagina_favoritos = 0
+
+        self.add_widget(
+            Label(
+                text=NOME_APP,
+                size_hint_y=None,
+                height=dp(45),
+                font_size="22sp"
+            )
+        )
+
+        self.add_widget(
+            Label(
+                text="Biblioteca",
+                size_hint_y=None,
+                height=dp(30),
+                font_size="15sp"
+            )
+        )
+
+        grade = GridLayout(
+            cols=2,
+            spacing=dp(8),
+            size_hint_y=None,
+            row_default_height=dp(58),
+            row_force_default=True
+        )
+
+        grade.bind(
+            minimum_height=grade.setter(
+                "height"
+            )
+        )
+
+        for modulo in MODULOS:
+            botao = Button(
+                text=modulo,
+                font_size="14sp"
+            )
+
+            botao.bind(
+                on_release=lambda b:
+                self.selecionar_modulo(
+                    b.text
+                )
+            )
+
+            grade.add_widget(
+                botao
+            )
+
+        self.add_widget(
+            grade
+        )
+
+        self.status = Label(
+            text="Biblioteca pronta.",
+            size_hint_y=None,
+            height=dp(42)
+        )
+
+        self.add_widget(
+            self.status
+        )
+
+    def selecionar_modulo(
+        self,
+        modulo
+    ):
+        if modulo == "Categorias":
+            self.abrir_categorias()
+            return
+
+        if modulo == "Documentos":
+            self.abrir_documentos()
+            return
+
+        if modulo == "PDFs":
+            self.abrir_pdfs()
+            return
+
+        if modulo == "Imagens":
+            self.abrir_imagens()
+            return
+
+        if modulo == "Pesquisa":
+            self.abrir_pesquisa()
+            return
+
+        if modulo == "Favoritos":
+            self.abrir_favoritos()
+            return
+
+        self.status.text = (
+            "Módulo selecionado: "
+            + modulo
+        )
+
+
+    def carregar_favoritos(self):
+        if not self.arquivo_favoritos.exists():
+            return []
+
+        try:
+            dados = json.loads(
+                self.arquivo_favoritos.read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            if isinstance(dados, list):
+                return dados
+
+        except Exception:
+            pass
+
+        return []
+
+    def salvar_favoritos(self, favoritos):
+        self.arquivo_favoritos.write_text(
+            json.dumps(
+                favoritos,
+                ensure_ascii=False,
+                indent=2
+            ),
+            encoding="utf-8"
+        )
+
+    def esta_favorito(
+        self,
+        origem,
+        item_id
+    ):
+        return any(
+            item.get(
+                "origem"
+            ) == origem
+            and item.get(
+                "item_id"
+            ) == item_id
+            for item in self.carregar_favoritos()
+        )
+
+    def alternar_favorito(
+        self,
+        origem,
+        item
+    ):
+        favoritos = (
+            self.carregar_favoritos()
+        )
+
+        item_id = item.get(
+            "id"
+        )
+
+        existente = None
+
+        for favorito in favoritos:
+            if (
+                favorito.get(
+                    "origem"
+                ) == origem
+                and favorito.get(
+                    "item_id"
+                ) == item_id
+            ):
+                existente = favorito
+                break
+
+        if existente is not None:
+            favoritos.remove(
+                existente
+            )
+
+            self.salvar_favoritos(
+                favoritos
+            )
+
+            return False
+
+        favoritos.append({
+            "origem":
+                origem,
+
+            "item_id":
+                item_id,
+
+            "tipo":
+                item.get(
+                    "tipo",
+                    (
+                        "Imagem"
+                        if origem == "imagens"
+                        else "Documento"
+                    )
+                ),
+
+            "titulo":
+                item.get(
+                    "titulo",
+                    ""
+                ),
+
+            "categoria_nome":
+                item.get(
+                    "categoria_nome",
+                    ""
+                ),
+        })
+
+        self.salvar_favoritos(
+            favoritos
+        )
+
+        return True
+
+    def localizar_item_favorito(
+        self,
+        favorito
+    ):
+        origem = favorito.get(
+            "origem"
+        )
+
+        item_id = favorito.get(
+            "item_id"
+        )
+
+        if origem == "documentos":
+            fonte = (
+                self.carregar_documentos()
+            )
+
+        elif origem == "imagens":
+            fonte = (
+                self.carregar_imagens()
+            )
+
+        else:
+            return None
+
+        for item in fonte:
+            if item.get(
+                "id"
+            ) == item_id:
+                return item
+
+        return None
+
+    def abrir_item_favorito(
+        self,
+        favorito,
+        ao_atualizar
+    ):
+        item = (
+            self.localizar_item_favorito(
+                favorito
+            )
+        )
+
+        if item is None:
+            self.status.text = (
+                "O item original não foi encontrado."
+            )
+            return
+
+        origem = favorito.get(
+            "origem"
+        )
+
+        tipo = item.get(
+            "tipo",
+            ""
+        )
+
+        if (
+            origem == "documentos"
+            and tipo == "PDF"
+        ):
+            self.visualizar_pdf(
+                item,
+                ao_atualizar
+            )
+            return
+
+        if origem == "documentos":
+            self.visualizar_documento(
+                item,
+                ao_atualizar
+            )
+            return
+
+        if origem == "imagens":
+            self.visualizar_imagem(
+                item,
+                ao_atualizar
+            )
+            return
+
+    def abrir_favoritos(self):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text="FAVORITOS",
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(
+            titulo
+        )
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(
+            lista
+        )
+
+        navegacao = BoxLayout(
+            spacing=dp(7),
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(
+            anterior
+        )
+
+        navegacao.add_widget(
+            proximo
+        )
+
+        caixa.add_widget(
+            navegacao
+        )
+
+        fechar = Button(
+            text="FECHAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(
+            fechar
+        )
+
+        popup = Popup(
+            title="Favoritos",
+            content=caixa,
+            size_hint=(0.96, 0.92),
+            auto_dismiss=False
+        )
+
+        def atualizar():
+            lista.clear_widgets()
+
+            favoritos = (
+                self.carregar_favoritos()
+            )
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(favoritos)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if (
+                self.pagina_favoritos
+                >= total_paginas
+            ):
+                self.pagina_favoritos = (
+                    total_paginas - 1
+                )
+
+            if self.pagina_favoritos < 0:
+                self.pagina_favoritos = 0
+
+            inicio = (
+                self.pagina_favoritos
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            pagina = favoritos[
+                inicio:fim
+            ]
+
+            if not pagina:
+                lista.add_widget(
+                    Label(
+                        text=(
+                            "Nenhum favorito cadastrado."
+                        )
+                    )
+                )
+
+            for favorito in pagina:
+                botao = Button(
+                    text=(
+                        favorito.get(
+                            "titulo",
+                            ""
+                        )
+                        + " - "
+                        + favorito.get(
+                            "tipo",
+                            ""
+                        )
+                        + "\n"
+                        + favorito.get(
+                            "categoria_nome",
+                            "Sem categoria"
+                        )
+                    ),
+                    size_hint_y=None,
+                    height=dp(70)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, f=favorito:
+                    self.abrir_item_favorito(
+                        f,
+                        atualizar
+                    )
+                )
+
+                lista.add_widget(
+                    botao
+                )
+
+            titulo.text = (
+                "FAVORITOS  "
+                + str(
+                    self.pagina_favoritos + 1
+                )
+                + "/"
+                + str(
+                    total_paginas
+                )
+                + "   Total: "
+                + str(
+                    len(favoritos)
+                )
+            )
+
+        def voltar(*_):
+            if self.pagina_favoritos > 0:
+                self.pagina_favoritos -= 1
+                atualizar()
+
+        def avancar(*_):
+            favoritos = (
+                self.carregar_favoritos()
+            )
+
+            total_paginas = max(
+                1,
+                (
+                    len(favoritos) + 3
+                ) // 4
+            )
+
+            if (
+                self.pagina_favoritos + 1
+                < total_paginas
+            ):
+                self.pagina_favoritos += 1
+                atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar()
+        popup.open()
+
+    def itens_pesquisaveis(self):
+        itens = []
+
+        for documento in self.carregar_documentos():
+            copia = dict(
+                documento
+            )
+
+            copia[
+                "_origem"
+            ] = "documentos"
+
+            itens.append(
+                copia
+            )
+
+        for imagem in self.carregar_imagens():
+            copia = dict(
+                imagem
+            )
+
+            copia[
+                "_origem"
+            ] = "imagens"
+
+            itens.append(
+                copia
+            )
+
+        return itens
+
+    def normalizar_texto_pesquisa(
+        self,
+        valor
+    ):
+        texto = unicodedata.normalize(
+            "NFKD",
+            str(
+                valor or ""
+            )
+        )
+
+        texto = "".join(
+            caractere
+            for caractere in texto
+            if not unicodedata.combining(
+                caractere
+            )
+        )
+
+        return " ".join(
+            texto.casefold().split()
+        )
+
+    def pesquisar_itens(
+        self,
+        termo
+    ):
+        termo = (
+            self.normalizar_texto_pesquisa(
+                termo
+            )
+        )
+
+        if not termo:
+            return []
+
+        resultados = []
+
+        for item in self.itens_pesquisaveis():
+            campos = [
+                item.get(
+                    "titulo",
+                    ""
+                ),
+
+                item.get(
+                    "categoria_nome",
+                    ""
+                ),
+
+                item.get(
+                    "autor",
+                    ""
+                ),
+
+                item.get(
+                    "referencia",
+                    ""
+                ),
+
+                item.get(
+                    "descricao",
+                    ""
+                ),
+
+                item.get(
+                    "tipo",
+                    ""
+                ),
+
+                item.get(
+                    "status",
+                    ""
+                ),
+            ]
+
+            texto_item = (
+                self.normalizar_texto_pesquisa(
+                    " ".join(
+                        str(
+                            campo or ""
+                        )
+                        for campo in campos
+                    )
+                )
+            )
+
+            if termo in texto_item:
+                resultados.append(
+                    item
+                )
+
+        return resultados
+
+    def abrir_resultado_pesquisa(
+        self,
+        item,
+        ao_atualizar
+    ):
+        origem = item.get(
+            "_origem",
+            ""
+        )
+
+        tipo = item.get(
+            "tipo",
+            ""
+        )
+
+        if (
+            origem == "documentos"
+            and tipo == "PDF"
+        ):
+            self.visualizar_pdf(
+                item,
+                ao_atualizar
+            )
+            return
+
+        if origem == "documentos":
+            self.visualizar_documento(
+                item,
+                ao_atualizar
+            )
+            return
+
+        if origem == "imagens":
+            self.visualizar_imagem(
+                item,
+                ao_atualizar
+            )
+            return
+
+        self.status.text = (
+            "Tipo de resultado desconhecido."
+        )
+
+    def abrir_pesquisa(self):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text="PESQUISA",
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(
+            titulo
+        )
+
+        termo = TextInput(
+            hint_text=(
+                "Pesquisar título, categoria, "
+                "autor ou descrição"
+            ),
+            multiline=False,
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(
+            termo
+        )
+
+        pesquisar = Button(
+            text="PESQUISAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(
+            pesquisar
+        )
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(
+            lista
+        )
+
+        navegacao = BoxLayout(
+            spacing=dp(7),
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(
+            anterior
+        )
+
+        navegacao.add_widget(
+            proximo
+        )
+
+        caixa.add_widget(
+            navegacao
+        )
+
+        fechar = Button(
+            text="FECHAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(
+            fechar
+        )
+
+        popup = Popup(
+            title="Pesquisa",
+            content=caixa,
+            size_hint=(0.96, 0.94),
+            auto_dismiss=False
+        )
+
+        estado = {
+            "resultados": [],
+            "termo": "",
+        }
+
+        def atualizar():
+            lista.clear_widgets()
+
+            resultados = estado[
+                "resultados"
+            ]
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(resultados)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if (
+                self.pagina_pesquisa
+                >= total_paginas
+            ):
+                self.pagina_pesquisa = (
+                    total_paginas - 1
+                )
+
+            if self.pagina_pesquisa < 0:
+                self.pagina_pesquisa = 0
+
+            inicio = (
+                self.pagina_pesquisa
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            pagina = resultados[
+                inicio:fim
+            ]
+
+            if not estado[
+                "termo"
+            ]:
+                lista.add_widget(
+                    Label(
+                        text=(
+                            "Digite um termo e toque "
+                            "em PESQUISAR."
+                        )
+                    )
+                )
+
+            elif not pagina:
+                lista.add_widget(
+                    Label(
+                        text=(
+                            "Nenhum resultado encontrado."
+                        )
+                    )
+                )
+
+            for item in pagina:
+                tipo = item.get(
+                    "tipo",
+                    "Documento"
+                )
+
+                botao = Button(
+                    text=(
+                        item.get(
+                            "titulo",
+                            ""
+                        )
+                        + " - "
+                        + tipo
+                        + "\n"
+                        + item.get(
+                            "categoria_nome",
+                            "Sem categoria"
+                        )
+                        + " - "
+                        + item.get(
+                            "status",
+                            ""
+                        )
+                    ),
+                    size_hint_y=None,
+                    height=dp(70)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, i=item:
+                    self.abrir_resultado_pesquisa(
+                        i,
+                        refazer_pesquisa
+                    )
+                )
+
+                lista.add_widget(
+                    botao
+                )
+
+            if estado[
+                "termo"
+            ]:
+                titulo.text = (
+                    "PESQUISA  "
+                    + str(
+                        self.pagina_pesquisa + 1
+                    )
+                    + "/"
+                    + str(
+                        total_paginas
+                    )
+                    + "   Resultados: "
+                    + str(
+                        len(resultados)
+                    )
+                )
+            else:
+                titulo.text = (
+                    "PESQUISA"
+                )
+
+        def refazer_pesquisa(*_):
+            pesquisa_atual = (
+                estado[
+                    "termo"
+                ]
+            )
+
+            if pesquisa_atual:
+                estado[
+                    "resultados"
+                ] = self.pesquisar_itens(
+                    pesquisa_atual
+                )
+
+            atualizar()
+
+        def executar_pesquisa(*_):
+            termo_texto = (
+                termo.text.strip()
+            )
+
+            estado[
+                "termo"
+            ] = termo_texto
+
+            self.pagina_pesquisa = 0
+
+            estado[
+                "resultados"
+            ] = self.pesquisar_itens(
+                termo_texto
+            )
+
+            atualizar()
+
+        def voltar(*_):
+            if self.pagina_pesquisa > 0:
+                self.pagina_pesquisa -= 1
+                atualizar()
+
+        def avancar(*_):
+            resultados = estado[
+                "resultados"
+            ]
+
+            total_paginas = max(
+                1,
+                (
+                    len(resultados) + 3
+                ) // 4
+            )
+
+            if (
+                self.pagina_pesquisa + 1
+                < total_paginas
+            ):
+                self.pagina_pesquisa += 1
+                atualizar()
+
+        pesquisar.bind(
+            on_release=executar_pesquisa
+        )
+
+        termo.bind(
+            on_text_validate=executar_pesquisa
+        )
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar()
+        popup.open()
+
+    def carregar_imagens(self):
+        if not self.arquivo_imagens.exists():
+            return []
+
+        try:
+            dados = json.loads(
+                self.arquivo_imagens.read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            if isinstance(dados, list):
+                return dados
+
+        except Exception:
+            pass
+
+        return []
+
+    def salvar_imagens(self, imagens):
+        self.arquivo_imagens.write_text(
+            json.dumps(
+                imagens,
+                ensure_ascii=False,
+                indent=2
+            ),
+            encoding="utf-8"
+        )
+
+    def proximo_id_imagem(self):
+        imagens = (
+            self.carregar_imagens()
+        )
+
+        ids = []
+
+        for item in imagens:
+            try:
+                ids.append(
+                    int(
+                        item.get(
+                            "id",
+                            0
+                        )
+                    )
+                )
+            except Exception:
+                pass
+
+        return max(
+            ids,
+            default=0
+        ) + 1
+
+    def abrir_imagens(self):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text="IMAGENS",
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(
+            titulo
+        )
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(
+            lista
+        )
+
+        navegacao = BoxLayout(
+            spacing=dp(6),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        nova = Button(
+            text="NOVA"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(
+            anterior
+        )
+
+        navegacao.add_widget(
+            nova
+        )
+
+        navegacao.add_widget(
+            proximo
+        )
+
+        caixa.add_widget(
+            navegacao
+        )
+
+        fechar = Button(
+            text="FECHAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(
+            fechar
+        )
+
+        popup = Popup(
+            title="Imagens",
+            content=caixa,
+            size_hint=(0.96, 0.92),
+            auto_dismiss=False
+        )
+
+        def atualizar():
+            lista.clear_widgets()
+
+            imagens = (
+                self.carregar_imagens()
+            )
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(imagens)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if (
+                self.pagina_imagens
+                >= total_paginas
+            ):
+                self.pagina_imagens = (
+                    total_paginas - 1
+                )
+
+            inicio = (
+                self.pagina_imagens
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            pagina = imagens[
+                inicio:fim
+            ]
+
+            if not pagina:
+                lista.add_widget(
+                    Label(
+                        text=(
+                            "Nenhuma imagem cadastrada."
+                        )
+                    )
+                )
+
+            for item in pagina:
+                botao = Button(
+                    text=(
+                        item.get(
+                            "titulo",
+                            ""
+                        )
+                        + " - "
+                        + item.get(
+                            "status",
+                            "Ativa"
+                        )
+                        + "\n"
+                        + item.get(
+                            "categoria_nome",
+                            "Sem categoria"
+                        )
+                    ),
+                    size_hint_y=None,
+                    height=dp(70)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, i=item:
+                    self.visualizar_imagem(
+                        i,
+                        atualizar
+                    )
+                )
+
+                lista.add_widget(
+                    botao
+                )
+
+            titulo.text = (
+                "IMAGENS  "
+                + str(
+                    self.pagina_imagens + 1
+                )
+                + "/"
+                + str(total_paginas)
+                + "   Total: "
+                + str(
+                    len(imagens)
+                )
+            )
+
+        def voltar(*_):
+            if self.pagina_imagens > 0:
+                self.pagina_imagens -= 1
+                atualizar()
+
+        def avancar(*_):
+            imagens = (
+                self.carregar_imagens()
+            )
+
+            total_paginas = max(
+                1,
+                (
+                    len(imagens) + 3
+                ) // 4
+            )
+
+            if (
+                self.pagina_imagens + 1
+                < total_paginas
+            ):
+                self.pagina_imagens += 1
+                atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        nova.bind(
+            on_release=lambda *_:
+            self.nova_imagem(
+                atualizar
+            )
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar()
+        popup.open()
+
+    def nova_imagem(
+        self,
+        ao_salvar
+    ):
+        if not self.categorias_ativas():
+            self.status.text = (
+                "Cadastre ou reative uma categoria "
+                "antes de criar imagens."
+            )
+            return
+
+        selecao = {
+            "categoria": None
+        }
+
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6),
+            padding=dp(10)
+        )
+
+        titulo = TextInput(
+            hint_text="Título da imagem",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        categoria = TextInput(
+            hint_text="Escolha a categoria",
+            readonly=True,
+            multiline=False,
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        escolher = Button(
+            text="ESCOLHER CATEGORIA",
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        arquivo = TextInput(
+            hint_text="Nome / localização da imagem",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        descricao = TextInput(
+            hint_text="Descrição",
+            multiline=True,
+            size_hint_y=None,
+            height=dp(130)
+        )
+
+        caixa.add_widget(
+            titulo
+        )
+
+        caixa.add_widget(
+            categoria
+        )
+
+        caixa.add_widget(
+            escolher
+        )
+
+        caixa.add_widget(
+            arquivo
+        )
+
+        caixa.add_widget(
+            descricao
+        )
+
+        aviso = Label(
+            text="",
+            size_hint_y=None,
+            height=dp(28)
+        )
+
+        caixa.add_widget(
+            aviso
+        )
+
+        botoes = BoxLayout(
+            spacing=dp(8),
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        cancelar = Button(
+            text="CANCELAR"
+        )
+
+        salvar = Button(
+            text="SALVAR"
+        )
+
+        botoes.add_widget(
+            cancelar
+        )
+
+        botoes.add_widget(
+            salvar
+        )
+
+        caixa.add_widget(
+            botoes
+        )
+
+        popup = Popup(
+            title="Nova Imagem",
+            content=caixa,
+            size_hint=(0.94, 0.90),
+            auto_dismiss=False
+        )
+
+        def recebeu_categoria(item):
+            selecao[
+                "categoria"
+            ] = item
+
+            categoria.text = (
+                item.get(
+                    "nome",
+                    ""
+                )
+            )
+
+        escolher.bind(
+            on_release=lambda *_:
+            self.escolher_categoria(
+                recebeu_categoria
+            )
+        )
+
+        cancelar.bind(
+            on_release=popup.dismiss
+        )
+
+        def confirmar(*_):
+            titulo_texto = (
+                titulo.text.strip()
+            )
+
+            if not titulo_texto:
+                aviso.text = (
+                    "Digite o título."
+                )
+                return
+
+            categoria_item = selecao[
+                "categoria"
+            ]
+
+            if categoria_item is None:
+                aviso.text = (
+                    "Escolha a categoria."
+                )
+                return
+
+            arquivo_texto = (
+                arquivo.text.strip()
+            )
+
+            if not arquivo_texto:
+                aviso.text = (
+                    "Informe o arquivo ou localização."
+                )
+                return
+
+            imagens = (
+                self.carregar_imagens()
+            )
+
+            imagens.append({
+                "id":
+                    self.proximo_id_imagem(),
+
+                "tipo":
+                    "Imagem",
+
+                "titulo":
+                    titulo_texto,
+
+                "categoria_id":
+                    categoria_item.get(
+                        "id"
+                    ),
+
+                "categoria_nome":
+                    categoria_item.get(
+                        "nome",
+                        ""
+                    ),
+
+                "referencia":
+                    arquivo_texto,
+
+                "descricao":
+                    descricao.text.strip(),
+
+                "status":
+                    "Ativa",
+            })
+
+            self.salvar_imagens(
+                imagens
+            )
+
+            popup.dismiss()
+
+            self.status.text = (
+                "Imagem salva: "
+                + titulo_texto
+            )
+
+            ao_salvar()
+
+        salvar.bind(
+            on_release=confirmar
+        )
+
+        popup.open()
+
+    def visualizar_imagem(
+        self,
+        imagem,
+        ao_atualizar
+    ):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(12)
+        )
+
+        caixa.add_widget(
+            Label(
+                text=imagem.get(
+                    "titulo",
+                    ""
+                ),
+                size_hint_y=None,
+                height=dp(42),
+                font_size="19sp"
+            )
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Categoria: "
+                    + imagem.get(
+                        "categoria_nome",
+                        ""
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(34)
+            )
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Arquivo / localização:\n"
+                    + imagem.get(
+                        "referencia",
+                        ""
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(55)
+            )
+        )
+
+        descricao = imagem.get(
+            "descricao",
+            ""
+        )
+
+        if not descricao:
+            descricao = (
+                "Sem descrição."
+            )
+
+        if len(descricao) > 450:
+            descricao = (
+                descricao[:447]
+                + "..."
+            )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Descrição:\n"
+                    + descricao
+                ),
+                halign="left",
+                valign="top"
+            )
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Status: "
+                    + imagem.get(
+                        "status",
+                        "Ativa"
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(34)
+            )
+        )
+
+        botoes = BoxLayout(
+            spacing=dp(8),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        status_btn = Button(
+            text=(
+                "ARQUIVAR"
+                if imagem.get(
+                    "status",
+                    "Ativa"
+                ) == "Ativa"
+                else "REATIVAR"
+            )
+        )
+
+        favorito_btn = Button(
+            text=(
+                "REMOVER FAVORITO"
+                if self.esta_favorito(
+                    "imagens",
+                    imagem.get(
+                        "id"
+                    )
+                )
+                else "FAVORITAR"
+            )
+        )
+
+        fechar = Button(
+            text="FECHAR"
+        )
+
+        botoes.add_widget(
+            status_btn
+        )
+
+        botoes.add_widget(
+            favorito_btn
+        )
+
+        botoes.add_widget(
+            fechar
+        )
+
+        caixa.add_widget(
+            botoes
+        )
+
+        popup = Popup(
+            title="Imagem",
+            content=caixa,
+            size_hint=(0.94, 0.86),
+            auto_dismiss=False
+        )
+
+        def alternar_status(*_):
+            imagens = (
+                self.carregar_imagens()
+            )
+
+            id_alvo = imagem.get(
+                "id"
+            )
+
+            for item in imagens:
+                if (
+                    item.get(
+                        "id"
+                    ) == id_alvo
+                ):
+                    item["status"] = (
+                        "Arquivada"
+                        if item.get(
+                            "status",
+                            "Ativa"
+                        ) == "Ativa"
+                        else "Ativa"
+                    )
+
+                    imagem[
+                        "status"
+                    ] = item[
+                        "status"
+                    ]
+
+                    break
+
+            self.salvar_imagens(
+                imagens
+            )
+
+            popup.dismiss()
+            ao_atualizar()
+
+        def alternar_favorito_item(*_):
+            ficou_favorito = (
+                self.alternar_favorito(
+                    "imagens",
+                    imagem
+                )
+            )
+
+            favorito_btn.text = (
+                "REMOVER FAVORITO"
+                if ficou_favorito
+                else "FAVORITAR"
+            )
+
+        status_btn.bind(
+            on_release=alternar_status
+        )
+
+        favorito_btn.bind(
+            on_release=alternar_favorito_item
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        popup.open()
+
+    def pdfs_registrados(self):
+        return [
+            item
+            for item in self.carregar_documentos()
+            if item.get(
+                "tipo"
+            ) == "PDF"
+        ]
+
+    def abrir_pdfs(self):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text="PDFs",
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(
+            titulo
+        )
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(
+            lista
+        )
+
+        navegacao = BoxLayout(
+            spacing=dp(6),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        novo = Button(
+            text="NOVO"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(
+            anterior
+        )
+
+        navegacao.add_widget(
+            novo
+        )
+
+        navegacao.add_widget(
+            proximo
+        )
+
+        caixa.add_widget(
+            navegacao
+        )
+
+        fechar = Button(
+            text="FECHAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(
+            fechar
+        )
+
+        popup = Popup(
+            title="PDFs",
+            content=caixa,
+            size_hint=(0.96, 0.92),
+            auto_dismiss=False
+        )
+
+        def atualizar():
+            lista.clear_widgets()
+
+            pdfs = (
+                self.pdfs_registrados()
+            )
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(pdfs)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if (
+                self.pagina_pdfs
+                >= total_paginas
+            ):
+                self.pagina_pdfs = (
+                    total_paginas - 1
+                )
+
+            inicio = (
+                self.pagina_pdfs
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            pagina = pdfs[
+                inicio:fim
+            ]
+
+            if not pagina:
+                lista.add_widget(
+                    Label(
+                        text=(
+                            "Nenhum PDF cadastrado."
+                        )
+                    )
+                )
+
+            for item in pagina:
+                botao = Button(
+                    text=(
+                        item.get(
+                            "titulo",
+                            ""
+                        )
+                        + " - "
+                        + item.get(
+                            "status",
+                            "Ativo"
+                        )
+                        + "\n"
+                        + item.get(
+                            "categoria_nome",
+                            "Sem categoria"
+                        )
+                    ),
+                    size_hint_y=None,
+                    height=dp(70)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, d=item:
+                    self.visualizar_pdf(
+                        d,
+                        atualizar
+                    )
+                )
+
+                lista.add_widget(
+                    botao
+                )
+
+            titulo.text = (
+                "PDFs  "
+                + str(
+                    self.pagina_pdfs + 1
+                )
+                + "/"
+                + str(total_paginas)
+                + "   Total: "
+                + str(
+                    len(pdfs)
+                )
+            )
+
+        def voltar(*_):
+            if self.pagina_pdfs > 0:
+                self.pagina_pdfs -= 1
+                atualizar()
+
+        def avancar(*_):
+            pdfs = (
+                self.pdfs_registrados()
+            )
+
+            total_paginas = max(
+                1,
+                (
+                    len(pdfs) + 3
+                ) // 4
+            )
+
+            if (
+                self.pagina_pdfs + 1
+                < total_paginas
+            ):
+                self.pagina_pdfs += 1
+                atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        novo.bind(
+            on_release=lambda *_:
+            self.novo_pdf(
+                atualizar
+            )
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar()
+        popup.open()
+
+    def novo_pdf(
+        self,
+        ao_salvar
+    ):
+        if not self.categorias_ativas():
+            self.status.text = (
+                "Cadastre ou reative uma categoria "
+                "antes de criar PDFs."
+            )
+            return
+
+        selecao = {
+            "categoria": None
+        }
+
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6),
+            padding=dp(10)
+        )
+
+        titulo = TextInput(
+            hint_text="Título do PDF",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        categoria = TextInput(
+            hint_text="Escolha a categoria",
+            readonly=True,
+            multiline=False,
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        escolher = Button(
+            text="ESCOLHER CATEGORIA",
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        autor = TextInput(
+            hint_text="Autor / Origem",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        arquivo = TextInput(
+            hint_text="Nome / localização do arquivo PDF",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        descricao = TextInput(
+            hint_text="Descrição",
+            multiline=True,
+            size_hint_y=None,
+            height=dp(105)
+        )
+
+        caixa.add_widget(
+            titulo
+        )
+
+        caixa.add_widget(
+            categoria
+        )
+
+        caixa.add_widget(
+            escolher
+        )
+
+        caixa.add_widget(
+            autor
+        )
+
+        caixa.add_widget(
+            arquivo
+        )
+
+        caixa.add_widget(
+            descricao
+        )
+
+        aviso = Label(
+            text="",
+            size_hint_y=None,
+            height=dp(28)
+        )
+
+        caixa.add_widget(
+            aviso
+        )
+
+        botoes = BoxLayout(
+            spacing=dp(8),
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        cancelar = Button(
+            text="CANCELAR"
+        )
+
+        salvar = Button(
+            text="SALVAR"
+        )
+
+        botoes.add_widget(
+            cancelar
+        )
+
+        botoes.add_widget(
+            salvar
+        )
+
+        caixa.add_widget(
+            botoes
+        )
+
+        popup = Popup(
+            title="Novo PDF",
+            content=caixa,
+            size_hint=(0.94, 0.96),
+            auto_dismiss=False
+        )
+
+        def recebeu_categoria(item):
+            selecao[
+                "categoria"
+            ] = item
+
+            categoria.text = (
+                item.get(
+                    "nome",
+                    ""
+                )
+            )
+
+        escolher.bind(
+            on_release=lambda *_:
+            self.escolher_categoria(
+                recebeu_categoria
+            )
+        )
+
+        cancelar.bind(
+            on_release=popup.dismiss
+        )
+
+        def confirmar(*_):
+            titulo_texto = (
+                titulo.text.strip()
+            )
+
+            if not titulo_texto:
+                aviso.text = (
+                    "Digite o título."
+                )
+                return
+
+            categoria_item = selecao[
+                "categoria"
+            ]
+
+            if categoria_item is None:
+                aviso.text = (
+                    "Escolha a categoria."
+                )
+                return
+
+            arquivo_texto = (
+                arquivo.text.strip()
+            )
+
+            if not arquivo_texto:
+                aviso.text = (
+                    "Informe o arquivo ou localização."
+                )
+                return
+
+            documentos = (
+                self.carregar_documentos()
+            )
+
+            documentos.append({
+                "id":
+                    self.proximo_id_documento(),
+
+                "tipo":
+                    "PDF",
+
+                "titulo":
+                    titulo_texto,
+
+                "categoria_id":
+                    categoria_item.get(
+                        "id"
+                    ),
+
+                "categoria_nome":
+                    categoria_item.get(
+                        "nome",
+                        ""
+                    ),
+
+                "autor":
+                    autor.text.strip(),
+
+                "referencia":
+                    arquivo_texto,
+
+                "descricao":
+                    descricao.text.strip(),
+
+                "status":
+                    "Ativo",
+            })
+
+            self.salvar_documentos(
+                documentos
+            )
+
+            popup.dismiss()
+
+            self.status.text = (
+                "PDF salvo: "
+                + titulo_texto
+            )
+
+            ao_salvar()
+
+        salvar.bind(
+            on_release=confirmar
+        )
+
+        popup.open()
+
+    def visualizar_pdf(
+        self,
+        pdf,
+        ao_atualizar
+    ):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(12)
+        )
+
+        caixa.add_widget(
+            Label(
+                text=pdf.get(
+                    "titulo",
+                    ""
+                ),
+                size_hint_y=None,
+                height=dp(42),
+                font_size="19sp"
+            )
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Categoria: "
+                    + pdf.get(
+                        "categoria_nome",
+                        ""
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(34)
+            )
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Autor / Origem: "
+                    + pdf.get(
+                        "autor",
+                        ""
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(34)
+            )
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Arquivo / localização:\n"
+                    + pdf.get(
+                        "referencia",
+                        ""
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(54)
+            )
+        )
+
+        descricao = pdf.get(
+            "descricao",
+            ""
+        )
+
+        if not descricao:
+            descricao = (
+                "Sem descrição."
+            )
+
+        if len(descricao) > 420:
+            descricao = (
+                descricao[:417]
+                + "..."
+            )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Descrição:\n"
+                    + descricao
+                ),
+                halign="left",
+                valign="top"
+            )
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Status: "
+                    + pdf.get(
+                        "status",
+                        "Ativo"
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(34)
+            )
+        )
+
+        botoes = BoxLayout(
+            spacing=dp(8),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        status_btn = Button(
+            text=(
+                "ARQUIVAR"
+                if pdf.get(
+                    "status",
+                    "Ativo"
+                ) == "Ativo"
+                else "REATIVAR"
+            )
+        )
+
+        favorito_btn = Button(
+            text=(
+                "REMOVER FAVORITO"
+                if self.esta_favorito(
+                    "documentos",
+                    pdf.get(
+                        "id"
+                    )
+                )
+                else "FAVORITAR"
+            )
+        )
+
+        fechar = Button(
+            text="FECHAR"
+        )
+
+        botoes.add_widget(
+            status_btn
+        )
+
+        botoes.add_widget(
+            favorito_btn
+        )
+
+        botoes.add_widget(
+            fechar
+        )
+
+        caixa.add_widget(
+            botoes
+        )
+
+        popup = Popup(
+            title="PDF",
+            content=caixa,
+            size_hint=(0.94, 0.88),
+            auto_dismiss=False
+        )
+
+        def alternar_status(*_):
+            documentos = (
+                self.carregar_documentos()
+            )
+
+            id_alvo = pdf.get(
+                "id"
+            )
+
+            for item in documentos:
+                if (
+                    item.get(
+                        "id"
+                    ) == id_alvo
+                    and item.get(
+                        "tipo"
+                    ) == "PDF"
+                ):
+                    item["status"] = (
+                        "Arquivado"
+                        if item.get(
+                            "status",
+                            "Ativo"
+                        ) == "Ativo"
+                        else "Ativo"
+                    )
+
+                    pdf[
+                        "status"
+                    ] = item[
+                        "status"
+                    ]
+
+                    break
+
+            self.salvar_documentos(
+                documentos
+            )
+
+            popup.dismiss()
+            ao_atualizar()
+
+        def alternar_favorito_item(*_):
+            ficou_favorito = (
+                self.alternar_favorito(
+                    "documentos",
+                    pdf
+                )
+            )
+
+            favorito_btn.text = (
+                "REMOVER FAVORITO"
+                if ficou_favorito
+                else "FAVORITAR"
+            )
+
+        status_btn.bind(
+            on_release=alternar_status
+        )
+
+        favorito_btn.bind(
+            on_release=alternar_favorito_item
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        popup.open()
+
+    def carregar_documentos(self):
+        if not self.arquivo_documentos.exists():
+            return []
+
+        try:
+            dados = json.loads(
+                self.arquivo_documentos.read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            if isinstance(dados, list):
+                return dados
+
+        except Exception:
+            pass
+
+        return []
+
+    def salvar_documentos(self, documentos):
+        self.arquivo_documentos.write_text(
+            json.dumps(
+                documentos,
+                ensure_ascii=False,
+                indent=2
+            ),
+            encoding="utf-8"
+        )
+
+    def proximo_id_documento(self):
+        documentos = (
+            self.carregar_documentos()
+        )
+
+        ids = []
+
+        for item in documentos:
+            try:
+                ids.append(
+                    int(
+                        item.get(
+                            "id",
+                            0
+                        )
+                    )
+                )
+            except Exception:
+                pass
+
+        return max(
+            ids,
+            default=0
+        ) + 1
+
+    def documentos_normais(self):
+        return [
+            item
+            for item in self.carregar_documentos()
+            if item.get(
+                "tipo",
+                "Documento"
+            ) == "Documento"
+        ]
+
+    def abrir_documentos(self):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text="DOCUMENTOS",
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(
+            titulo
+        )
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(
+            lista
+        )
+
+        navegacao = BoxLayout(
+            spacing=dp(6),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        novo = Button(
+            text="NOVO"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(
+            anterior
+        )
+
+        navegacao.add_widget(
+            novo
+        )
+
+        navegacao.add_widget(
+            proximo
+        )
+
+        caixa.add_widget(
+            navegacao
+        )
+
+        fechar = Button(
+            text="FECHAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(
+            fechar
+        )
+
+        popup = Popup(
+            title="Documentos",
+            content=caixa,
+            size_hint=(0.96, 0.92),
+            auto_dismiss=False
+        )
+
+        def atualizar():
+            lista.clear_widgets()
+
+            documentos = (
+                self.documentos_normais()
+            )
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(documentos)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if (
+                self.pagina_documentos
+                >= total_paginas
+            ):
+                self.pagina_documentos = (
+                    total_paginas - 1
+                )
+
+            inicio = (
+                self.pagina_documentos
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            pagina = documentos[
+                inicio:fim
+            ]
+
+            if not pagina:
+                lista.add_widget(
+                    Label(
+                        text=(
+                            "Nenhum documento cadastrado."
+                        )
+                    )
+                )
+
+            for item in pagina:
+                botao = Button(
+                    text=(
+                        item.get(
+                            "titulo",
+                            ""
+                        )
+                        + " - "
+                        + item.get(
+                            "status",
+                            "Ativo"
+                        )
+                        + "\n"
+                        + item.get(
+                            "categoria_nome",
+                            "Sem categoria"
+                        )
+                    ),
+                    size_hint_y=None,
+                    height=dp(70)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, d=item:
+                    self.visualizar_documento(
+                        d,
+                        atualizar
+                    )
+                )
+
+                lista.add_widget(
+                    botao
+                )
+
+            titulo.text = (
+                "DOCUMENTOS  "
+                + str(
+                    self.pagina_documentos + 1
+                )
+                + "/"
+                + str(total_paginas)
+                + "   Total: "
+                + str(
+                    len(documentos)
+                )
+            )
+
+        def voltar(*_):
+            if self.pagina_documentos > 0:
+                self.pagina_documentos -= 1
+                atualizar()
+
+        def avancar(*_):
+            documentos = (
+                self.documentos_normais()
+            )
+
+            total_paginas = max(
+                1,
+                (
+                    len(documentos) + 3
+                ) // 4
+            )
+
+            if (
+                self.pagina_documentos + 1
+                < total_paginas
+            ):
+                self.pagina_documentos += 1
+                atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        novo.bind(
+            on_release=lambda *_:
+            self.novo_documento(
+                atualizar
+            )
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar()
+        popup.open()
+
+    def novo_documento(
+        self,
+        ao_salvar
+    ):
+        if not self.categorias_ativas():
+            self.status.text = (
+                "Cadastre ou reative uma categoria "
+                "antes de criar documentos."
+            )
+            return
+
+        selecao = {
+            "categoria": None
+        }
+
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6),
+            padding=dp(10)
+        )
+
+        titulo = TextInput(
+            hint_text="Título do documento",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        categoria = TextInput(
+            hint_text="Escolha a categoria",
+            readonly=True,
+            multiline=False,
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        escolher = Button(
+            text="ESCOLHER CATEGORIA",
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        autor = TextInput(
+            hint_text="Autor / Origem",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        referencia = TextInput(
+            hint_text="Referência / Localização",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        descricao = TextInput(
+            hint_text="Descrição",
+            multiline=True,
+            size_hint_y=None,
+            height=dp(105)
+        )
+
+        caixa.add_widget(
+            titulo
+        )
+
+        caixa.add_widget(
+            categoria
+        )
+
+        caixa.add_widget(
+            escolher
+        )
+
+        caixa.add_widget(
+            autor
+        )
+
+        caixa.add_widget(
+            referencia
+        )
+
+        caixa.add_widget(
+            descricao
+        )
+
+        aviso = Label(
+            text="",
+            size_hint_y=None,
+            height=dp(28)
+        )
+
+        caixa.add_widget(
+            aviso
+        )
+
+        botoes = BoxLayout(
+            spacing=dp(8),
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        cancelar = Button(
+            text="CANCELAR"
+        )
+
+        salvar = Button(
+            text="SALVAR"
+        )
+
+        botoes.add_widget(
+            cancelar
+        )
+
+        botoes.add_widget(
+            salvar
+        )
+
+        caixa.add_widget(
+            botoes
+        )
+
+        popup = Popup(
+            title="Novo Documento",
+            content=caixa,
+            size_hint=(0.94, 0.96),
+            auto_dismiss=False
+        )
+
+        def recebeu_categoria(item):
+            selecao[
+                "categoria"
+            ] = item
+
+            categoria.text = (
+                item.get(
+                    "nome",
+                    ""
+                )
+            )
+
+        escolher.bind(
+            on_release=lambda *_:
+            self.escolher_categoria(
+                recebeu_categoria
+            )
+        )
+
+        cancelar.bind(
+            on_release=popup.dismiss
+        )
+
+        def confirmar(*_):
+            titulo_texto = (
+                titulo.text.strip()
+            )
+
+            if not titulo_texto:
+                aviso.text = (
+                    "Digite o título."
+                )
+                return
+
+            categoria_item = selecao[
+                "categoria"
+            ]
+
+            if categoria_item is None:
+                aviso.text = (
+                    "Escolha a categoria."
+                )
+                return
+
+            documentos = (
+                self.carregar_documentos()
+            )
+
+            documentos.append({
+                "id":
+                    self.proximo_id_documento(),
+
+                "tipo":
+                    "Documento",
+
+                "titulo":
+                    titulo_texto,
+
+                "categoria_id":
+                    categoria_item.get(
+                        "id"
+                    ),
+
+                "categoria_nome":
+                    categoria_item.get(
+                        "nome",
+                        ""
+                    ),
+
+                "autor":
+                    autor.text.strip(),
+
+                "referencia":
+                    referencia.text.strip(),
+
+                "descricao":
+                    descricao.text.strip(),
+
+                "status":
+                    "Ativo",
+            })
+
+            self.salvar_documentos(
+                documentos
+            )
+
+            popup.dismiss()
+
+            self.status.text = (
+                "Documento salvo: "
+                + titulo_texto
+            )
+
+            ao_salvar()
+
+        salvar.bind(
+            on_release=confirmar
+        )
+
+        popup.open()
+
+    def visualizar_documento(
+        self,
+        documento,
+        ao_atualizar
+    ):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(12)
+        )
+
+        caixa.add_widget(
+            Label(
+                text=documento.get(
+                    "titulo",
+                    ""
+                ),
+                size_hint_y=None,
+                height=dp(42),
+                font_size="19sp"
+            )
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Categoria: "
+                    + documento.get(
+                        "categoria_nome",
+                        ""
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(34)
+            )
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Autor / Origem: "
+                    + documento.get(
+                        "autor",
+                        ""
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(34)
+            )
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Referência: "
+                    + documento.get(
+                        "referencia",
+                        ""
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(38)
+            )
+        )
+
+        descricao = documento.get(
+            "descricao",
+            ""
+        )
+
+        if not descricao:
+            descricao = (
+                "Sem descrição."
+            )
+
+        if len(descricao) > 420:
+            descricao = (
+                descricao[:417]
+                + "..."
+            )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Descrição:\n"
+                    + descricao
+                ),
+                halign="left",
+                valign="top"
+            )
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Status: "
+                    + documento.get(
+                        "status",
+                        "Ativo"
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(34)
+            )
+        )
+
+        botoes = BoxLayout(
+            spacing=dp(8),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        status_btn = Button(
+            text=(
+                "ARQUIVAR"
+                if documento.get(
+                    "status",
+                    "Ativo"
+                ) == "Ativo"
+                else "REATIVAR"
+            )
+        )
+
+        favorito_btn = Button(
+            text=(
+                "REMOVER FAVORITO"
+                if self.esta_favorito(
+                    "documentos",
+                    documento.get(
+                        "id"
+                    )
+                )
+                else "FAVORITAR"
+            )
+        )
+
+        fechar = Button(
+            text="FECHAR"
+        )
+
+        botoes.add_widget(
+            status_btn
+        )
+
+        botoes.add_widget(
+            favorito_btn
+        )
+
+        botoes.add_widget(
+            fechar
+        )
+
+        caixa.add_widget(
+            botoes
+        )
+
+        popup = Popup(
+            title="Documento",
+            content=caixa,
+            size_hint=(0.94, 0.88),
+            auto_dismiss=False
+        )
+
+        def alternar_status(*_):
+            documentos = (
+                self.carregar_documentos()
+            )
+
+            id_alvo = documento.get(
+                "id"
+            )
+
+            for item in documentos:
+                if (
+                    item.get(
+                        "id"
+                    ) == id_alvo
+                    and item.get(
+                        "tipo",
+                        "Documento"
+                    ) == "Documento"
+                ):
+                    item["status"] = (
+                        "Arquivado"
+                        if item.get(
+                            "status",
+                            "Ativo"
+                        ) == "Ativo"
+                        else "Ativo"
+                    )
+
+                    documento[
+                        "status"
+                    ] = item[
+                        "status"
+                    ]
+
+                    break
+
+            self.salvar_documentos(
+                documentos
+            )
+
+            popup.dismiss()
+            ao_atualizar()
+
+        def alternar_favorito_item(*_):
+            ficou_favorito = (
+                self.alternar_favorito(
+                    "documentos",
+                    documento
+                )
+            )
+
+            favorito_btn.text = (
+                "REMOVER FAVORITO"
+                if ficou_favorito
+                else "FAVORITAR"
+            )
+
+        status_btn.bind(
+            on_release=alternar_status
+        )
+
+        favorito_btn.bind(
+            on_release=alternar_favorito_item
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        popup.open()
+
+    def carregar_categorias(self):
+        if not self.arquivo_categorias.exists():
+            return []
+
+        try:
+            dados = json.loads(
+                self.arquivo_categorias.read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            if isinstance(dados, list):
+                return dados
+
+        except Exception:
+            pass
+
+        return []
+
+    def salvar_categorias(self, categorias):
+        self.arquivo_categorias.write_text(
+            json.dumps(
+                categorias,
+                ensure_ascii=False,
+                indent=2
+            ),
+            encoding="utf-8"
+        )
+
+    def proximo_id_categoria(self):
+        categorias = (
+            self.carregar_categorias()
+        )
+
+        ids = []
+
+        for item in categorias:
+            try:
+                ids.append(
+                    int(
+                        item.get(
+                            "id",
+                            0
+                        )
+                    )
+                )
+            except Exception:
+                pass
+
+        return max(
+            ids,
+            default=0
+        ) + 1
+
+    def categorias_ativas(self):
+        return [
+            item
+            for item in self.carregar_categorias()
+            if item.get(
+                "status",
+                "Ativa"
+            ) == "Ativa"
+        ]
+
+    def abrir_categorias(self):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text="CATEGORIAS",
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(
+            titulo
+        )
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(
+            lista
+        )
+
+        navegacao = BoxLayout(
+            spacing=dp(6),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        nova = Button(
+            text="NOVA"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(
+            anterior
+        )
+
+        navegacao.add_widget(
+            nova
+        )
+
+        navegacao.add_widget(
+            proximo
+        )
+
+        caixa.add_widget(
+            navegacao
+        )
+
+        fechar = Button(
+            text="FECHAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(
+            fechar
+        )
+
+        popup = Popup(
+            title="Categorias",
+            content=caixa,
+            size_hint=(0.96, 0.92),
+            auto_dismiss=False
+        )
+
+        def atualizar():
+            lista.clear_widgets()
+
+            categorias = (
+                self.carregar_categorias()
+            )
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(categorias)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if (
+                self.pagina_categorias
+                >= total_paginas
+            ):
+                self.pagina_categorias = (
+                    total_paginas - 1
+                )
+
+            inicio = (
+                self.pagina_categorias
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            pagina = categorias[
+                inicio:fim
+            ]
+
+            if not pagina:
+                lista.add_widget(
+                    Label(
+                        text=(
+                            "Nenhuma categoria cadastrada."
+                        )
+                    )
+                )
+
+            for item in pagina:
+                botao = Button(
+                    text=(
+                        item.get(
+                            "nome",
+                            ""
+                        )
+                        + "\n"
+                        + item.get(
+                            "status",
+                            "Ativa"
+                        )
+                    ),
+                    size_hint_y=None,
+                    height=dp(68)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, c=item:
+                    self.visualizar_categoria(
+                        c,
+                        atualizar
+                    )
+                )
+
+                lista.add_widget(
+                    botao
+                )
+
+            titulo.text = (
+                "CATEGORIAS  "
+                + str(
+                    self.pagina_categorias + 1
+                )
+                + "/"
+                + str(
+                    total_paginas
+                )
+                + "   Total: "
+                + str(
+                    len(categorias)
+                )
+            )
+
+        def voltar(*_):
+            if self.pagina_categorias > 0:
+                self.pagina_categorias -= 1
+                atualizar()
+
+        def avancar(*_):
+            categorias = (
+                self.carregar_categorias()
+            )
+
+            total_paginas = max(
+                1,
+                (
+                    len(categorias) + 3
+                ) // 4
+            )
+
+            if (
+                self.pagina_categorias + 1
+                < total_paginas
+            ):
+                self.pagina_categorias += 1
+                atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        nova.bind(
+            on_release=lambda *_:
+            self.nova_categoria(
+                atualizar
+            )
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar()
+        popup.open()
+
+    def nova_categoria(
+        self,
+        ao_salvar
+    ):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(8),
+            padding=dp(12)
+        )
+
+        nome = TextInput(
+            hint_text="Nome da categoria",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        descricao = TextInput(
+            hint_text="Descrição",
+            multiline=True,
+            size_hint_y=None,
+            height=dp(150)
+        )
+
+        caixa.add_widget(
+            nome
+        )
+
+        caixa.add_widget(
+            descricao
+        )
+
+        aviso = Label(
+            text="",
+            size_hint_y=None,
+            height=dp(34)
+        )
+
+        caixa.add_widget(
+            aviso
+        )
+
+        botoes = BoxLayout(
+            spacing=dp(8),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        cancelar = Button(
+            text="CANCELAR"
+        )
+
+        salvar = Button(
+            text="SALVAR"
+        )
+
+        botoes.add_widget(
+            cancelar
+        )
+
+        botoes.add_widget(
+            salvar
+        )
+
+        caixa.add_widget(
+            botoes
+        )
+
+        popup = Popup(
+            title="Nova Categoria",
+            content=caixa,
+            size_hint=(0.92, 0.74),
+            auto_dismiss=False
+        )
+
+        cancelar.bind(
+            on_release=popup.dismiss
+        )
+
+        def confirmar(*_):
+            nome_texto = (
+                nome.text.strip()
+            )
+
+            if not nome_texto:
+                aviso.text = (
+                    "Digite o nome da categoria."
+                )
+                return
+
+            categorias = (
+                self.carregar_categorias()
+            )
+
+            nome_normalizado = (
+                nome_texto
+                .casefold()
+            )
+
+            duplicada = any(
+                str(
+                    item.get(
+                        "nome",
+                        ""
+                    )
+                ).strip().casefold()
+                == nome_normalizado
+                for item in categorias
+            )
+
+            if duplicada:
+                aviso.text = (
+                    "Essa categoria já existe."
+                )
+                return
+
+            categorias.append({
+                "id":
+                    self.proximo_id_categoria(),
+
+                "nome":
+                    nome_texto,
+
+                "descricao":
+                    descricao.text.strip(),
+
+                "status":
+                    "Ativa",
+            })
+
+            self.salvar_categorias(
+                categorias
+            )
+
+            popup.dismiss()
+
+            self.status.text = (
+                "Categoria salva: "
+                + nome_texto
+            )
+
+            ao_salvar()
+
+        salvar.bind(
+            on_release=confirmar
+        )
+
+        popup.open()
+
+    def visualizar_categoria(
+        self,
+        categoria,
+        ao_atualizar
+    ):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(8),
+            padding=dp(12)
+        )
+
+        caixa.add_widget(
+            Label(
+                text=categoria.get(
+                    "nome",
+                    ""
+                ),
+                size_hint_y=None,
+                height=dp(45),
+                font_size="20sp"
+            )
+        )
+
+        descricao = categoria.get(
+            "descricao",
+            ""
+        )
+
+        if not descricao:
+            descricao = (
+                "Sem descrição."
+            )
+
+        if len(descricao) > 500:
+            descricao = (
+                descricao[:497]
+                + "..."
+            )
+
+        caixa.add_widget(
+            Label(
+                text=descricao,
+                halign="left",
+                valign="top"
+            )
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Status: "
+                    + categoria.get(
+                        "status",
+                        "Ativa"
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(36)
+            )
+        )
+
+        botoes = BoxLayout(
+            spacing=dp(8),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        status_btn = Button(
+            text=(
+                "ARQUIVAR"
+                if categoria.get(
+                    "status",
+                    "Ativa"
+                ) == "Ativa"
+                else "REATIVAR"
+            )
+        )
+
+        fechar = Button(
+            text="FECHAR"
+        )
+
+        botoes.add_widget(
+            status_btn
+        )
+
+        botoes.add_widget(
+            fechar
+        )
+
+        caixa.add_widget(
+            botoes
+        )
+
+        popup = Popup(
+            title="Categoria",
+            content=caixa,
+            size_hint=(0.92, 0.78),
+            auto_dismiss=False
+        )
+
+        def alternar_status(*_):
+            categorias = (
+                self.carregar_categorias()
+            )
+
+            id_alvo = categoria.get(
+                "id"
+            )
+
+            for item in categorias:
+                if (
+                    item.get(
+                        "id"
+                    ) == id_alvo
+                ):
+                    item["status"] = (
+                        "Arquivada"
+                        if item.get(
+                            "status",
+                            "Ativa"
+                        ) == "Ativa"
+                        else "Ativa"
+                    )
+
+                    categoria[
+                        "status"
+                    ] = item[
+                        "status"
+                    ]
+
+                    break
+
+            self.salvar_categorias(
+                categorias
+            )
+
+            popup.dismiss()
+            ao_atualizar()
+
+        status_btn.bind(
+            on_release=alternar_status
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        popup.open()
+
+    def escolher_categoria(
+        self,
+        ao_escolher
+    ):
+        categorias = (
+            self.categorias_ativas()
+        )
+
+        if not categorias:
+            self.status.text = (
+                "Nenhuma categoria ativa."
+            )
+            return
+
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text="ESCOLHER CATEGORIA",
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(
+            titulo
+        )
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(
+            lista
+        )
+
+        navegacao = BoxLayout(
+            spacing=dp(7),
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(
+            anterior
+        )
+
+        navegacao.add_widget(
+            proximo
+        )
+
+        caixa.add_widget(
+            navegacao
+        )
+
+        cancelar = Button(
+            text="CANCELAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(
+            cancelar
+        )
+
+        popup = Popup(
+            title="Categoria",
+            content=caixa,
+            size_hint=(0.92, 0.84),
+            auto_dismiss=False
+        )
+
+        pagina = {
+            "numero": 0
+        }
+
+        def selecionar(item):
+            ao_escolher(
+                item
+            )
+            popup.dismiss()
+
+        def atualizar():
+            lista.clear_widgets()
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(categorias)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if (
+                pagina["numero"]
+                >= total_paginas
+            ):
+                pagina["numero"] = (
+                    total_paginas - 1
+                )
+
+            inicio = (
+                pagina["numero"]
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            atual = categorias[
+                inicio:fim
+            ]
+
+            for item in atual:
+                botao = Button(
+                    text=item.get(
+                        "nome",
+                        ""
+                    ),
+                    size_hint_y=None,
+                    height=dp(62)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, c=item:
+                    selecionar(c)
+                )
+
+                lista.add_widget(
+                    botao
+                )
+
+            titulo.text = (
+                "CATEGORIAS  "
+                + str(
+                    pagina["numero"] + 1
+                )
+                + "/"
+                + str(
+                    total_paginas
+                )
+            )
+
+        def voltar(*_):
+            if pagina["numero"] > 0:
+                pagina["numero"] -= 1
+                atualizar()
+
+        def avancar(*_):
+            total_paginas = max(
+                1,
+                (
+                    len(categorias) + 3
+                ) // 4
+            )
+
+            if (
+                pagina["numero"] + 1
+                < total_paginas
+            ):
+                pagina["numero"] += 1
+                atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        cancelar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar()
+        popup.open()
+
+
+class AplicativoGerado(App):
+
+    def build(self):
+        self.title = NOME_APP
+
+        return BibliotecaApp()
+
+
+if __name__ == "__main__":
+    AplicativoGerado().run()

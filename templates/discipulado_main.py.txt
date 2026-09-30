@@ -1,0 +1,5295 @@
+import json
+from pathlib import Path
+
+from kivy.app import App
+from kivy.metrics import dp
+
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.gridlayout import GridLayout
+from kivy.uix.button import Button
+from kivy.uix.label import Label
+from kivy.uix.popup import Popup
+from kivy.uix.textinput import TextInput
+
+
+NOME_APP = @@NOME_APP@@
+MODELO = @@MODELO@@
+MODULOS = @@MODULOS@@
+
+
+class DiscipuladoApp(BoxLayout):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.orientation = "vertical"
+        self.spacing = dp(8)
+        self.padding = dp(10)
+
+        nome_pasta_app = "".join(
+            caractere
+            if caractere.isalnum()
+            else "_"
+            for caractere in NOME_APP
+        ).strip("_").lower()
+
+        pasta = (
+            Path(
+                App.get_running_app().user_data_dir
+            )
+            / nome_pasta_app
+        )
+
+        pasta.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+
+        self.arquivo_discipulos = (
+            pasta / "discipulos.json"
+        )
+
+        self.arquivo_estudos = (
+            pasta / "estudos.json"
+        )
+
+        self.arquivo_questoes = (
+            pasta / "questoes.json"
+        )
+
+        self.arquivo_respostas = (
+            pasta / "respostas.json"
+        )
+
+        self.arquivo_presencas = (
+            pasta / "presencas.json"
+        )
+
+        self.arquivo_observacoes = (
+            pasta / "observacoes.json"
+        )
+
+        self.pagina_discipulos = 0
+        self.pagina_estudos = 0
+        self.pagina_questoes = 0
+        self.pagina_respostas = 0
+        self.pagina_presencas = 0
+        self.pagina_progresso = 0
+        self.pagina_observacoes = 0
+
+        self.add_widget(
+            Label(
+                text=NOME_APP,
+                size_hint_y=None,
+                height=dp(45),
+                font_size="22sp"
+            )
+        )
+
+        self.add_widget(
+            Label(
+                text=MODELO,
+                size_hint_y=None,
+                height=dp(30),
+                font_size="15sp"
+            )
+        )
+
+        grade = GridLayout(
+            cols=2,
+            spacing=dp(8),
+            size_hint_y=None,
+            row_default_height=dp(62),
+            row_force_default=True
+        )
+
+        grade.bind(
+            minimum_height=grade.setter("height")
+        )
+
+        for modulo in MODULOS:
+            botao = Button(
+                text=modulo,
+                font_size="15sp"
+            )
+
+            botao.bind(
+                on_release=lambda b:
+                self.selecionar_modulo(
+                    b.text
+                )
+            )
+
+            grade.add_widget(botao)
+
+        self.add_widget(grade)
+
+        self.status = Label(
+            text="Aplicativo pronto.",
+            size_hint_y=None,
+            height=dp(45)
+        )
+
+        self.add_widget(self.status)
+
+    def selecionar_modulo(self, modulo):
+        if modulo == "Discípulos":
+            self.abrir_discipulos()
+            return
+
+        if modulo == "Estudos":
+            self.abrir_estudos()
+            return
+
+        if modulo == "Questões":
+            self.abrir_questoes()
+            return
+
+        if modulo == "Respostas":
+            self.abrir_respostas()
+            return
+
+        if modulo == "Presença":
+            self.abrir_presencas()
+            return
+
+        if modulo == "Progresso":
+            self.abrir_progresso()
+            return
+
+        if modulo == "Observações":
+            self.abrir_observacoes()
+            return
+
+        self.status.text = (
+            "Módulo selecionado: "
+            + modulo
+        )
+
+
+    def carregar_observacoes(self):
+        if not self.arquivo_observacoes.exists():
+            return []
+
+        try:
+            dados = json.loads(
+                self.arquivo_observacoes.read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            if isinstance(dados, list):
+                return dados
+
+        except Exception:
+            pass
+
+        return []
+
+    def salvar_observacoes(self, observacoes):
+        self.arquivo_observacoes.write_text(
+            json.dumps(
+                observacoes,
+                ensure_ascii=False,
+                indent=2
+            ),
+            encoding="utf-8"
+        )
+
+    def proximo_id_observacao(self):
+        observacoes = self.carregar_observacoes()
+
+        ids = []
+
+        for item in observacoes:
+            try:
+                ids.append(
+                    int(
+                        item.get(
+                            "id",
+                            0
+                        )
+                    )
+                )
+            except Exception:
+                pass
+
+        return max(
+            ids,
+            default=0
+        ) + 1
+
+    def escolher_discipulo_observacao(
+        self,
+        ao_escolher
+    ):
+        self.escolher_discipulo_resposta(
+            ao_escolher
+        )
+
+    def abrir_observacoes(self):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text="OBSERVAÇÕES",
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(titulo)
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(lista)
+
+        navegacao = BoxLayout(
+            spacing=dp(6),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        nova = Button(
+            text="NOVA"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(anterior)
+        navegacao.add_widget(nova)
+        navegacao.add_widget(proximo)
+
+        caixa.add_widget(navegacao)
+
+        fechar = Button(
+            text="FECHAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(fechar)
+
+        popup = Popup(
+            title="Observações",
+            content=caixa,
+            size_hint=(0.96, 0.92),
+            auto_dismiss=False
+        )
+
+        def atualizar():
+            lista.clear_widgets()
+
+            observacoes = (
+                self.carregar_observacoes()
+            )
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(observacoes)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if (
+                self.pagina_observacoes
+                >= total_paginas
+            ):
+                self.pagina_observacoes = (
+                    total_paginas - 1
+                )
+
+            inicio = (
+                self.pagina_observacoes
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            pagina = observacoes[
+                inicio:fim
+            ]
+
+            if not pagina:
+                lista.add_widget(
+                    Label(
+                        text=(
+                            "Nenhuma observação registrada."
+                        )
+                    )
+                )
+
+            for item in pagina:
+                resumo = item.get(
+                    "texto",
+                    ""
+                )
+
+                if len(resumo) > 70:
+                    resumo = (
+                        resumo[:67]
+                        + "..."
+                    )
+
+                botao = Button(
+                    text=(
+                        item.get(
+                            "discipulo_nome",
+                            ""
+                        )
+                        + " - "
+                        + item.get(
+                            "data",
+                            ""
+                        )
+                        + "\n"
+                        + resumo
+                    ),
+                    size_hint_y=None,
+                    height=dp(72)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, o=item:
+                    self.visualizar_observacao(
+                        o,
+                        atualizar
+                    )
+                )
+
+                lista.add_widget(botao)
+
+            titulo.text = (
+                "OBSERVAÇÕES  "
+                + str(
+                    self.pagina_observacoes + 1
+                )
+                + "/"
+                + str(total_paginas)
+                + "   Total: "
+                + str(len(observacoes))
+            )
+
+        def voltar(*_):
+            if self.pagina_observacoes > 0:
+                self.pagina_observacoes -= 1
+                atualizar()
+
+        def avancar(*_):
+            observacoes = (
+                self.carregar_observacoes()
+            )
+
+            total_paginas = max(
+                1,
+                (
+                    len(observacoes) + 3
+                ) // 4
+            )
+
+            if (
+                self.pagina_observacoes + 1
+                < total_paginas
+            ):
+                self.pagina_observacoes += 1
+                atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        nova.bind(
+            on_release=lambda *_:
+            self.nova_observacao(
+                atualizar
+            )
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar()
+        popup.open()
+
+    def nova_observacao(
+        self,
+        ao_salvar
+    ):
+        selecao = {
+            "discipulo": None
+        }
+
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        discipulo_texto = TextInput(
+            hint_text="Escolha o discípulo",
+            readonly=True,
+            multiline=False,
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        escolher = Button(
+            text="ESCOLHER DISCÍPULO",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        data = TextInput(
+            hint_text="Data da observação",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        observacao = TextInput(
+            hint_text="Digite a observação",
+            multiline=True,
+            size_hint_y=None,
+            height=dp(170)
+        )
+
+        caixa.add_widget(discipulo_texto)
+        caixa.add_widget(escolher)
+        caixa.add_widget(data)
+        caixa.add_widget(observacao)
+
+        aviso = Label(
+            text="",
+            size_hint_y=None,
+            height=dp(32)
+        )
+
+        caixa.add_widget(aviso)
+
+        botoes = BoxLayout(
+            spacing=dp(8),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        cancelar = Button(
+            text="CANCELAR"
+        )
+
+        salvar = Button(
+            text="SALVAR"
+        )
+
+        botoes.add_widget(cancelar)
+        botoes.add_widget(salvar)
+
+        caixa.add_widget(botoes)
+
+        popup = Popup(
+            title="Nova Observação",
+            content=caixa,
+            size_hint=(0.94, 0.90),
+            auto_dismiss=False
+        )
+
+        def recebeu_discipulo(item):
+            selecao["discipulo"] = item
+
+            discipulo_texto.text = (
+                item.get(
+                    "nome",
+                    ""
+                )
+            )
+
+        escolher.bind(
+            on_release=lambda *_:
+            self.escolher_discipulo_observacao(
+                recebeu_discipulo
+            )
+        )
+
+        cancelar.bind(
+            on_release=popup.dismiss
+        )
+
+        def confirmar(*_):
+            discipulo = selecao[
+                "discipulo"
+            ]
+
+            if discipulo is None:
+                aviso.text = (
+                    "Escolha o discípulo."
+                )
+                return
+
+            data_texto = data.text.strip()
+
+            if not data_texto:
+                aviso.text = (
+                    "Digite a data."
+                )
+                return
+
+            texto_observacao = (
+                observacao.text.strip()
+            )
+
+            if not texto_observacao:
+                aviso.text = (
+                    "Digite a observação."
+                )
+                return
+
+            observacoes = (
+                self.carregar_observacoes()
+            )
+
+            observacoes.append({
+                "id":
+                    self.proximo_id_observacao(),
+
+                "discipulo_id":
+                    discipulo.get("id"),
+
+                "discipulo_nome":
+                    discipulo.get(
+                        "nome",
+                        ""
+                    ),
+
+                "data":
+                    data_texto,
+
+                "texto":
+                    texto_observacao,
+            })
+
+            self.salvar_observacoes(
+                observacoes
+            )
+
+            popup.dismiss()
+
+            self.status.text = (
+                "Observação salva."
+            )
+
+            ao_salvar()
+
+        salvar.bind(
+            on_release=confirmar
+        )
+
+        popup.open()
+
+    def visualizar_observacao(
+        self,
+        observacao,
+        ao_atualizar
+    ):
+        paginas = (
+            self.paginar_texto_estudo(
+                observacao.get(
+                    "texto",
+                    ""
+                ),
+                limite=600
+            )
+        )
+
+        pagina = {
+            "numero": 0
+        }
+
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    observacao.get(
+                        "discipulo_nome",
+                        ""
+                    )
+                    + " - "
+                    + observacao.get(
+                        "data",
+                        ""
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(42),
+                font_size="18sp"
+            )
+        )
+
+        texto_label = Label(
+            text="",
+            halign="left",
+            valign="top"
+        )
+
+        texto_label.bind(
+            size=lambda inst, valor:
+            setattr(
+                inst,
+                "text_size",
+                (
+                    valor[0],
+                    valor[1]
+                )
+            )
+        )
+
+        caixa.add_widget(texto_label)
+
+        indicador = Label(
+            text="",
+            size_hint_y=None,
+            height=dp(30)
+        )
+
+        caixa.add_widget(indicador)
+
+        navegacao = BoxLayout(
+            spacing=dp(7),
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        proximo = Button(
+            text="PRÓXIMA"
+        )
+
+        navegacao.add_widget(anterior)
+        navegacao.add_widget(proximo)
+
+        caixa.add_widget(navegacao)
+
+        fechar = Button(
+            text="FECHAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(fechar)
+
+        popup = Popup(
+            title="Observação",
+            content=caixa,
+            size_hint=(0.94, 0.90),
+            auto_dismiss=False
+        )
+
+        def atualizar_pagina():
+            texto_label.text = paginas[
+                pagina["numero"]
+            ]
+
+            indicador.text = (
+                "Página "
+                + str(
+                    pagina["numero"] + 1
+                )
+                + " de "
+                + str(len(paginas))
+            )
+
+        def voltar(*_):
+            if pagina["numero"] > 0:
+                pagina["numero"] -= 1
+                atualizar_pagina()
+
+        def avancar(*_):
+            if (
+                pagina["numero"] + 1
+                < len(paginas)
+            ):
+                pagina["numero"] += 1
+                atualizar_pagina()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar_pagina()
+        popup.open()
+
+    def calcular_progresso_discipulo(
+        self,
+        discipulo
+    ):
+        discipulo_id = discipulo.get(
+            "id"
+        )
+
+        estudos_ativos = [
+            estudo
+            for estudo in self.carregar_estudos()
+            if estudo.get(
+                "status",
+                "Ativo"
+            ) == "Ativo"
+        ]
+
+        ids_estudos_ativos = {
+            estudo.get("id")
+            for estudo in estudos_ativos
+        }
+
+        questoes_ativas = [
+            questao
+            for questao in self.carregar_questoes()
+            if (
+                questao.get(
+                    "status",
+                    "Ativa"
+                ) == "Ativa"
+                and questao.get(
+                    "estudo_id"
+                ) in ids_estudos_ativos
+            )
+        ]
+
+        respostas = [
+            resposta
+            for resposta in self.carregar_respostas()
+            if resposta.get(
+                "discipulo_id"
+            ) == discipulo_id
+        ]
+
+        questoes_respondidas_ids = {
+            resposta.get(
+                "questao_id"
+            )
+            for resposta in respostas
+            if str(
+                resposta.get(
+                    "resposta",
+                    ""
+                )
+            ).strip()
+        }
+
+        questoes_ativas_ids = {
+            questao.get("id")
+            for questao in questoes_ativas
+        }
+
+        respondidas_ativas = (
+            questoes_respondidas_ids
+            & questoes_ativas_ids
+        )
+
+        total_questoes = len(
+            questoes_ativas
+        )
+
+        total_respondidas = len(
+            respondidas_ativas
+        )
+
+        percentual_respostas = None
+
+        if total_questoes > 0:
+            percentual_respostas = round(
+                total_respondidas
+                * 100
+                / total_questoes
+            )
+
+        estudos_avaliaveis = 0
+        estudos_concluidos = 0
+
+        for estudo in estudos_ativos:
+            questoes_estudo = [
+                questao
+                for questao in questoes_ativas
+                if questao.get(
+                    "estudo_id"
+                ) == estudo.get("id")
+            ]
+
+            if not questoes_estudo:
+                continue
+
+            estudos_avaliaveis += 1
+
+            ids_questoes_estudo = {
+                questao.get("id")
+                for questao in questoes_estudo
+            }
+
+            if ids_questoes_estudo.issubset(
+                questoes_respondidas_ids
+            ):
+                estudos_concluidos += 1
+
+        percentual_estudos = None
+
+        if estudos_avaliaveis > 0:
+            percentual_estudos = round(
+                estudos_concluidos
+                * 100
+                / estudos_avaliaveis
+            )
+
+        presencas = [
+            registro
+            for registro in self.carregar_presencas()
+            if registro.get(
+                "discipulo_id"
+            ) == discipulo_id
+        ]
+
+        presentes = sum(
+            1
+            for registro in presencas
+            if registro.get(
+                "status"
+            ) == "Presente"
+        )
+
+        faltas = sum(
+            1
+            for registro in presencas
+            if registro.get(
+                "status"
+            ) == "Faltou"
+        )
+
+        encontros_finalizados = (
+            presentes
+            + faltas
+        )
+
+        percentual_frequencia = None
+
+        if encontros_finalizados > 0:
+            percentual_frequencia = round(
+                presentes
+                * 100
+                / encontros_finalizados
+            )
+
+        metricas = [
+            valor
+            for valor in (
+                percentual_respostas,
+                percentual_estudos,
+                percentual_frequencia,
+            )
+            if valor is not None
+        ]
+
+        progresso_geral = (
+            round(
+                sum(metricas)
+                / len(metricas)
+            )
+            if metricas
+            else 0
+        )
+
+        return {
+            "discipulo_id":
+                discipulo_id,
+
+            "discipulo_nome":
+                discipulo.get(
+                    "nome",
+                    ""
+                ),
+
+            "situacao":
+                discipulo.get(
+                    "situacao",
+                    "Ativo"
+                ),
+
+            "questoes_total":
+                total_questoes,
+
+            "questoes_respondidas":
+                total_respondidas,
+
+            "percentual_respostas":
+                percentual_respostas,
+
+            "estudos_total":
+                estudos_avaliaveis,
+
+            "estudos_concluidos":
+                estudos_concluidos,
+
+            "percentual_estudos":
+                percentual_estudos,
+
+            "presentes":
+                presentes,
+
+            "faltas":
+                faltas,
+
+            "encontros_finalizados":
+                encontros_finalizados,
+
+            "percentual_frequencia":
+                percentual_frequencia,
+
+            "progresso_geral":
+                progresso_geral,
+        }
+
+    def abrir_progresso(self):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text="PROGRESSO",
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(titulo)
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(lista)
+
+        navegacao = BoxLayout(
+            spacing=dp(7),
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(anterior)
+        navegacao.add_widget(proximo)
+
+        caixa.add_widget(navegacao)
+
+        fechar = Button(
+            text="FECHAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(fechar)
+
+        popup = Popup(
+            title="Progresso",
+            content=caixa,
+            size_hint=(0.96, 0.92),
+            auto_dismiss=False
+        )
+
+        def atualizar():
+            lista.clear_widgets()
+
+            discipulos = (
+                self.carregar_discipulos()
+            )
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(discipulos)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if (
+                self.pagina_progresso
+                >= total_paginas
+            ):
+                self.pagina_progresso = (
+                    total_paginas - 1
+                )
+
+            inicio = (
+                self.pagina_progresso
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            pagina = discipulos[
+                inicio:fim
+            ]
+
+            if not pagina:
+                lista.add_widget(
+                    Label(
+                        text=(
+                            "Nenhum discípulo cadastrado."
+                        )
+                    )
+                )
+
+            for discipulo in pagina:
+                dados = (
+                    self.calcular_progresso_discipulo(
+                        discipulo
+                    )
+                )
+
+                botao = Button(
+                    text=(
+                        dados[
+                            "discipulo_nome"
+                        ]
+                        + " - "
+                        + dados[
+                            "situacao"
+                        ]
+                        + "\n"
+                        + "Progresso geral: "
+                        + str(
+                            dados[
+                                "progresso_geral"
+                            ]
+                        )
+                        + "%"
+                    ),
+                    size_hint_y=None,
+                    height=dp(70)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, d=discipulo:
+                    self.visualizar_progresso(
+                        d
+                    )
+                )
+
+                lista.add_widget(botao)
+
+            titulo.text = (
+                "PROGRESSO  "
+                + str(
+                    self.pagina_progresso + 1
+                )
+                + "/"
+                + str(total_paginas)
+                + "   Total: "
+                + str(len(discipulos))
+            )
+
+        def voltar(*_):
+            if self.pagina_progresso > 0:
+                self.pagina_progresso -= 1
+                atualizar()
+
+        def avancar(*_):
+            discipulos = (
+                self.carregar_discipulos()
+            )
+
+            total_paginas = max(
+                1,
+                (
+                    len(discipulos) + 3
+                ) // 4
+            )
+
+            if (
+                self.pagina_progresso + 1
+                < total_paginas
+            ):
+                self.pagina_progresso += 1
+                atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar()
+        popup.open()
+
+    def visualizar_progresso(
+        self,
+        discipulo
+    ):
+        dados = (
+            self.calcular_progresso_discipulo(
+                discipulo
+            )
+        )
+
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(8),
+            padding=dp(12)
+        )
+
+        caixa.add_widget(
+            Label(
+                text=dados[
+                    "discipulo_nome"
+                ],
+                size_hint_y=None,
+                height=dp(42),
+                font_size="20sp"
+            )
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "PROGRESSO GERAL: "
+                    + str(
+                        dados[
+                            "progresso_geral"
+                        ]
+                    )
+                    + "%"
+                ),
+                size_hint_y=None,
+                height=dp(45),
+                font_size="18sp"
+            )
+        )
+
+        grade = GridLayout(
+            cols=2,
+            spacing=dp(5)
+        )
+
+        def percentual(valor):
+            if valor is None:
+                return "Sem dados"
+
+            return (
+                str(valor)
+                + "%"
+            )
+
+        itens = [
+            (
+                "Questões",
+                (
+                    str(
+                        dados[
+                            "questoes_respondidas"
+                        ]
+                    )
+                    + "/"
+                    + str(
+                        dados[
+                            "questoes_total"
+                        ]
+                    )
+                )
+            ),
+            (
+                "Respostas",
+                percentual(
+                    dados[
+                        "percentual_respostas"
+                    ]
+                )
+            ),
+            (
+                "Estudos",
+                (
+                    str(
+                        dados[
+                            "estudos_concluidos"
+                        ]
+                    )
+                    + "/"
+                    + str(
+                        dados[
+                            "estudos_total"
+                        ]
+                    )
+                )
+            ),
+            (
+                "Conclusão",
+                percentual(
+                    dados[
+                        "percentual_estudos"
+                    ]
+                )
+            ),
+            (
+                "Presenças",
+                str(
+                    dados[
+                        "presentes"
+                    ]
+                )
+            ),
+            (
+                "Faltas",
+                str(
+                    dados[
+                        "faltas"
+                    ]
+                )
+            ),
+            (
+                "Frequência",
+                percentual(
+                    dados[
+                        "percentual_frequencia"
+                    ]
+                )
+            ),
+            (
+                "Situação",
+                dados[
+                    "situacao"
+                ]
+            ),
+        ]
+
+        for nome, valor in itens:
+            grade.add_widget(
+                Label(
+                    text=nome
+                )
+            )
+
+            grade.add_widget(
+                Label(
+                    text=valor
+                )
+            )
+
+        caixa.add_widget(grade)
+
+        fechar = Button(
+            text="FECHAR",
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        caixa.add_widget(fechar)
+
+        popup = Popup(
+            title="Progresso do discípulo",
+            content=caixa,
+            size_hint=(0.92, 0.88),
+            auto_dismiss=False
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        popup.open()
+
+    def carregar_presencas(self):
+        if not self.arquivo_presencas.exists():
+            return []
+
+        try:
+            dados = json.loads(
+                self.arquivo_presencas.read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            if isinstance(dados, list):
+                return dados
+
+        except Exception:
+            pass
+
+        return []
+
+    def salvar_presencas(self, presencas):
+        self.arquivo_presencas.write_text(
+            json.dumps(
+                presencas,
+                ensure_ascii=False,
+                indent=2
+            ),
+            encoding="utf-8"
+        )
+
+    def proximo_id_presenca(self):
+        presencas = self.carregar_presencas()
+
+        ids = []
+
+        for item in presencas:
+            try:
+                ids.append(
+                    int(
+                        item.get(
+                            "id",
+                            0
+                        )
+                    )
+                )
+            except Exception:
+                pass
+
+        return max(
+            ids,
+            default=0
+        ) + 1
+
+    def preparar_data_presenca(self, data):
+        discipulos = [
+            item
+            for item in self.carregar_discipulos()
+            if item.get(
+                "situacao",
+                "Ativo"
+            ) == "Ativo"
+        ]
+
+        presencas = self.carregar_presencas()
+
+        alterou = False
+
+        for discipulo in discipulos:
+            existe = False
+
+            for registro in presencas:
+                if (
+                    registro.get("data") == data
+                    and registro.get(
+                        "discipulo_id"
+                    ) == discipulo.get("id")
+                ):
+                    existe = True
+                    break
+
+            if not existe:
+                presencas.append({
+                    "id":
+                        self.proximo_id_presenca(),
+
+                    "data":
+                        data,
+
+                    "discipulo_id":
+                        discipulo.get("id"),
+
+                    "discipulo_nome":
+                        discipulo.get(
+                            "nome",
+                            ""
+                        ),
+
+                    "status":
+                        "Pendente",
+                })
+
+                alterou = True
+
+        if alterou:
+            self.salvar_presencas(
+                presencas
+            )
+
+    def obter_status_presenca(
+        self,
+        data,
+        discipulo_id
+    ):
+        for registro in self.carregar_presencas():
+            if (
+                registro.get("data") == data
+                and registro.get(
+                    "discipulo_id"
+                ) == discipulo_id
+            ):
+                return registro.get(
+                    "status",
+                    "Pendente"
+                )
+
+        return "Pendente"
+
+    def alterar_status_presenca(
+        self,
+        data,
+        discipulo
+    ):
+        presencas = self.carregar_presencas()
+
+        atual = "Pendente"
+
+        registro_alvo = None
+
+        for registro in presencas:
+            if (
+                registro.get("data") == data
+                and registro.get(
+                    "discipulo_id"
+                ) == discipulo.get("id")
+            ):
+                registro_alvo = registro
+
+                atual = registro.get(
+                    "status",
+                    "Pendente"
+                )
+
+                break
+
+        ordem = {
+            "Pendente":
+                "Presente",
+
+            "Presente":
+                "Faltou",
+
+            "Faltou":
+                "Pendente",
+        }
+
+        novo_status = ordem.get(
+            atual,
+            "Pendente"
+        )
+
+        if registro_alvo is None:
+            presencas.append({
+                "id":
+                    self.proximo_id_presenca(),
+
+                "data":
+                    data,
+
+                "discipulo_id":
+                    discipulo.get("id"),
+
+                "discipulo_nome":
+                    discipulo.get(
+                        "nome",
+                        ""
+                    ),
+
+                "status":
+                    novo_status,
+            })
+
+        else:
+            registro_alvo[
+                "discipulo_nome"
+            ] = discipulo.get(
+                "nome",
+                ""
+            )
+
+            registro_alvo[
+                "status"
+            ] = novo_status
+
+        self.salvar_presencas(
+            presencas
+        )
+
+        return novo_status
+
+    def datas_presenca(self):
+        datas = []
+
+        for registro in self.carregar_presencas():
+            data = registro.get(
+                "data",
+                ""
+            ).strip()
+
+            if (
+                data
+                and data not in datas
+            ):
+                datas.append(data)
+
+        return list(
+            reversed(datas)
+        )
+
+    def abrir_presencas(self):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text="PRESENÇA",
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(titulo)
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(lista)
+
+        navegacao = BoxLayout(
+            spacing=dp(6),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        nova = Button(
+            text="NOVA DATA"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(anterior)
+        navegacao.add_widget(nova)
+        navegacao.add_widget(proximo)
+
+        caixa.add_widget(navegacao)
+
+        fechar = Button(
+            text="FECHAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(fechar)
+
+        popup = Popup(
+            title="Presença",
+            content=caixa,
+            size_hint=(0.96, 0.92),
+            auto_dismiss=False
+        )
+
+        def atualizar():
+            lista.clear_widgets()
+
+            datas = self.datas_presenca()
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(datas)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if (
+                self.pagina_presencas
+                >= total_paginas
+            ):
+                self.pagina_presencas = (
+                    total_paginas - 1
+                )
+
+            inicio = (
+                self.pagina_presencas
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            pagina = datas[
+                inicio:fim
+            ]
+
+            if not pagina:
+                lista.add_widget(
+                    Label(
+                        text=(
+                            "Nenhuma data registrada."
+                        )
+                    )
+                )
+
+            presencas = (
+                self.carregar_presencas()
+            )
+
+            for data in pagina:
+                registros = [
+                    item
+                    for item in presencas
+                    if item.get("data") == data
+                ]
+
+                presentes = sum(
+                    1
+                    for item in registros
+                    if item.get(
+                        "status"
+                    ) == "Presente"
+                )
+
+                faltas = sum(
+                    1
+                    for item in registros
+                    if item.get(
+                        "status"
+                    ) == "Faltou"
+                )
+
+                botao = Button(
+                    text=(
+                        data
+                        + "\n"
+                        + "Presentes: "
+                        + str(presentes)
+                        + "   Faltas: "
+                        + str(faltas)
+                    ),
+                    size_hint_y=None,
+                    height=dp(68)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, d=data:
+                    self.abrir_chamada(
+                        d,
+                        atualizar
+                    )
+                )
+
+                lista.add_widget(botao)
+
+            titulo.text = (
+                "PRESENÇA  "
+                + str(
+                    self.pagina_presencas + 1
+                )
+                + "/"
+                + str(total_paginas)
+                + "   Encontros: "
+                + str(len(datas))
+            )
+
+        def voltar(*_):
+            if self.pagina_presencas > 0:
+                self.pagina_presencas -= 1
+                atualizar()
+
+        def avancar(*_):
+            datas = self.datas_presenca()
+
+            total_paginas = max(
+                1,
+                (
+                    len(datas) + 3
+                ) // 4
+            )
+
+            if (
+                self.pagina_presencas + 1
+                < total_paginas
+            ):
+                self.pagina_presencas += 1
+                atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        nova.bind(
+            on_release=lambda *_:
+            self.nova_data_presenca(
+                atualizar
+            )
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar()
+        popup.open()
+
+    def nova_data_presenca(
+        self,
+        ao_salvar
+    ):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(10),
+            padding=dp(14)
+        )
+
+        data = TextInput(
+            hint_text="Data do encontro",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(52)
+        )
+
+        caixa.add_widget(
+            Label(
+                text="Digite a data do encontro",
+                size_hint_y=None,
+                height=dp(35)
+            )
+        )
+
+        caixa.add_widget(data)
+
+        aviso = Label(
+            text="",
+            size_hint_y=None,
+            height=dp(35)
+        )
+
+        caixa.add_widget(aviso)
+
+        botoes = BoxLayout(
+            spacing=dp(8),
+            size_hint_y=None,
+            height=dp(52)
+        )
+
+        cancelar = Button(
+            text="CANCELAR"
+        )
+
+        abrir = Button(
+            text="ABRIR CHAMADA"
+        )
+
+        botoes.add_widget(cancelar)
+        botoes.add_widget(abrir)
+
+        caixa.add_widget(botoes)
+
+        popup = Popup(
+            title="Novo Encontro",
+            content=caixa,
+            size_hint=(0.90, 0.58),
+            auto_dismiss=False
+        )
+
+        cancelar.bind(
+            on_release=popup.dismiss
+        )
+
+        def confirmar(*_):
+            data_texto = data.text.strip()
+
+            if not data_texto:
+                aviso.text = (
+                    "Digite a data."
+                )
+                return
+
+            discipulos_ativos = [
+                item
+                for item in self.carregar_discipulos()
+                if item.get(
+                    "situacao",
+                    "Ativo"
+                ) == "Ativo"
+            ]
+
+            if not discipulos_ativos:
+                aviso.text = (
+                    "Nenhum discípulo ativo."
+                )
+                return
+
+            self.preparar_data_presenca(
+                data_texto
+            )
+
+            popup.dismiss()
+
+            ao_salvar()
+
+            self.abrir_chamada(
+                data_texto,
+                ao_salvar
+            )
+
+        abrir.bind(
+            on_release=confirmar
+        )
+
+        popup.open()
+
+    def abrir_chamada(
+        self,
+        data,
+        ao_atualizar
+    ):
+        self.preparar_data_presenca(
+            data
+        )
+
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text=data,
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(titulo)
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(lista)
+
+        navegacao = BoxLayout(
+            spacing=dp(7),
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(anterior)
+        navegacao.add_widget(proximo)
+
+        caixa.add_widget(navegacao)
+
+        fechar = Button(
+            text="FECHAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(fechar)
+
+        popup = Popup(
+            title="Chamada",
+            content=caixa,
+            size_hint=(0.94, 0.90),
+            auto_dismiss=False
+        )
+
+        pagina = {
+            "numero": 0
+        }
+
+        def discipulos_da_data():
+            registros = [
+                item
+                for item in self.carregar_presencas()
+                if item.get("data") == data
+            ]
+
+            return registros
+
+        def atualizar():
+            lista.clear_widgets()
+
+            registros = (
+                discipulos_da_data()
+            )
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(registros)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if pagina["numero"] >= total_paginas:
+                pagina["numero"] = (
+                    total_paginas - 1
+                )
+
+            inicio = (
+                pagina["numero"]
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            atual = registros[
+                inicio:fim
+            ]
+
+            if not atual:
+                lista.add_widget(
+                    Label(
+                        text=(
+                            "Nenhum discípulo neste encontro."
+                        )
+                    )
+                )
+
+            for registro in atual:
+                discipulo = {
+                    "id":
+                        registro.get(
+                            "discipulo_id"
+                        ),
+
+                    "nome":
+                        registro.get(
+                            "discipulo_nome",
+                            ""
+                        ),
+                }
+
+                botao = Button(
+                    text=(
+                        registro.get(
+                            "discipulo_nome",
+                            ""
+                        )
+                        + "\n"
+                        + registro.get(
+                            "status",
+                            "Pendente"
+                        )
+                    ),
+                    size_hint_y=None,
+                    height=dp(68)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, d=discipulo:
+                    (
+                        self.alterar_status_presenca(
+                            data,
+                            d
+                        ),
+                        atualizar()
+                    )
+                )
+
+                lista.add_widget(botao)
+
+            titulo.text = (
+                data
+                + "   Página "
+                + str(
+                    pagina["numero"] + 1
+                )
+                + "/"
+                + str(total_paginas)
+            )
+
+        def voltar(*_):
+            if pagina["numero"] > 0:
+                pagina["numero"] -= 1
+                atualizar()
+
+        def avancar(*_):
+            total_paginas = max(
+                1,
+                (
+                    len(
+                        discipulos_da_data()
+                    )
+                    + 3
+                ) // 4
+            )
+
+            if (
+                pagina["numero"] + 1
+                < total_paginas
+            ):
+                pagina["numero"] += 1
+                atualizar()
+
+        def fechar_chamada(*_):
+            popup.dismiss()
+            ao_atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        fechar.bind(
+            on_release=fechar_chamada
+        )
+
+        atualizar()
+        popup.open()
+
+    def carregar_respostas(self):
+        if not self.arquivo_respostas.exists():
+            return []
+
+        try:
+            dados = json.loads(
+                self.arquivo_respostas.read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            if isinstance(dados, list):
+                return dados
+
+        except Exception:
+            pass
+
+        return []
+
+    def salvar_respostas(self, respostas):
+        self.arquivo_respostas.write_text(
+            json.dumps(
+                respostas,
+                ensure_ascii=False,
+                indent=2
+            ),
+            encoding="utf-8"
+        )
+
+    def proximo_id_resposta(self):
+        respostas = self.carregar_respostas()
+
+        ids = []
+
+        for item in respostas:
+            try:
+                ids.append(
+                    int(
+                        item.get(
+                            "id",
+                            0
+                        )
+                    )
+                )
+            except Exception:
+                pass
+
+        return max(
+            ids,
+            default=0
+        ) + 1
+
+    def escolher_discipulo_resposta(
+        self,
+        ao_escolher
+    ):
+        discipulos = [
+            item
+            for item in self.carregar_discipulos()
+            if item.get(
+                "situacao",
+                "Ativo"
+            ) == "Ativo"
+        ]
+
+        if not discipulos:
+            self.status.text = (
+                "Nenhum discípulo ativo cadastrado."
+            )
+            return
+
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text="ESCOLHER DISCÍPULO",
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(titulo)
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(lista)
+
+        navegacao = BoxLayout(
+            spacing=dp(7),
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(anterior)
+        navegacao.add_widget(proximo)
+
+        caixa.add_widget(navegacao)
+
+        cancelar = Button(
+            text="CANCELAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(cancelar)
+
+        popup = Popup(
+            title="Discípulo",
+            content=caixa,
+            size_hint=(0.92, 0.86),
+            auto_dismiss=False
+        )
+
+        pagina = {
+            "numero": 0
+        }
+
+        def selecionar(item):
+            ao_escolher(item)
+            popup.dismiss()
+
+        def atualizar():
+            lista.clear_widgets()
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(discipulos)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if pagina["numero"] >= total_paginas:
+                pagina["numero"] = (
+                    total_paginas - 1
+                )
+
+            inicio = (
+                pagina["numero"]
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            for item in discipulos[
+                inicio:fim
+            ]:
+                botao = Button(
+                    text=(
+                        item.get(
+                            "nome",
+                            ""
+                        )
+                        + "\n"
+                        + item.get(
+                            "contato",
+                            ""
+                        )
+                    ),
+                    size_hint_y=None,
+                    height=dp(65)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, d=item:
+                    selecionar(d)
+                )
+
+                lista.add_widget(botao)
+
+            titulo.text = (
+                "DISCÍPULOS  "
+                + str(
+                    pagina["numero"] + 1
+                )
+                + "/"
+                + str(total_paginas)
+            )
+
+        def voltar(*_):
+            if pagina["numero"] > 0:
+                pagina["numero"] -= 1
+                atualizar()
+
+        def avancar(*_):
+            total_paginas = max(
+                1,
+                (
+                    len(discipulos) + 3
+                ) // 4
+            )
+
+            if (
+                pagina["numero"] + 1
+                < total_paginas
+            ):
+                pagina["numero"] += 1
+                atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        cancelar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar()
+        popup.open()
+
+    def escolher_questao_resposta(
+        self,
+        ao_escolher
+    ):
+        estudos_ativos = {
+            estudo.get("id")
+            for estudo in self.carregar_estudos()
+            if estudo.get(
+                "status",
+                "Ativo"
+            ) == "Ativo"
+        }
+
+        questoes = [
+            item
+            for item in self.carregar_questoes()
+            if (
+                item.get(
+                    "status",
+                    "Ativa"
+                ) == "Ativa"
+                and item.get(
+                    "estudo_id"
+                ) in estudos_ativos
+            )
+        ]
+
+        if not questoes:
+            self.status.text = (
+                "Nenhuma questão ativa disponível."
+            )
+            return
+
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text="ESCOLHER QUESTÃO",
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(titulo)
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(lista)
+
+        navegacao = BoxLayout(
+            spacing=dp(7),
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(anterior)
+        navegacao.add_widget(proximo)
+
+        caixa.add_widget(navegacao)
+
+        cancelar = Button(
+            text="CANCELAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(cancelar)
+
+        popup = Popup(
+            title="Questão",
+            content=caixa,
+            size_hint=(0.94, 0.88),
+            auto_dismiss=False
+        )
+
+        pagina = {
+            "numero": 0
+        }
+
+        def selecionar(item):
+            ao_escolher(item)
+            popup.dismiss()
+
+        def atualizar():
+            lista.clear_widgets()
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(questoes)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if pagina["numero"] >= total_paginas:
+                pagina["numero"] = (
+                    total_paginas - 1
+                )
+
+            inicio = (
+                pagina["numero"]
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            for item in questoes[
+                inicio:fim
+            ]:
+                pergunta = item.get(
+                    "pergunta",
+                    ""
+                )
+
+                if len(pergunta) > 75:
+                    pergunta = (
+                        pergunta[:72]
+                        + "..."
+                    )
+
+                botao = Button(
+                    text=(
+                        item.get(
+                            "estudo_titulo",
+                            ""
+                        )
+                        + "\n"
+                        + pergunta
+                    ),
+                    size_hint_y=None,
+                    height=dp(72)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, q=item:
+                    selecionar(q)
+                )
+
+                lista.add_widget(botao)
+
+            titulo.text = (
+                "QUESTÕES  "
+                + str(
+                    pagina["numero"] + 1
+                )
+                + "/"
+                + str(total_paginas)
+            )
+
+        def voltar(*_):
+            if pagina["numero"] > 0:
+                pagina["numero"] -= 1
+                atualizar()
+
+        def avancar(*_):
+            total_paginas = max(
+                1,
+                (
+                    len(questoes) + 3
+                ) // 4
+            )
+
+            if (
+                pagina["numero"] + 1
+                < total_paginas
+            ):
+                pagina["numero"] += 1
+                atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        cancelar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar()
+        popup.open()
+
+    def abrir_respostas(self):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text="RESPOSTAS",
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(titulo)
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(lista)
+
+        navegacao = BoxLayout(
+            spacing=dp(6),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        nova = Button(
+            text="RESPONDER"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(anterior)
+        navegacao.add_widget(nova)
+        navegacao.add_widget(proximo)
+
+        caixa.add_widget(navegacao)
+
+        fechar = Button(
+            text="FECHAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(fechar)
+
+        popup = Popup(
+            title="Respostas",
+            content=caixa,
+            size_hint=(0.96, 0.92),
+            auto_dismiss=False
+        )
+
+        def atualizar():
+            lista.clear_widgets()
+
+            respostas = (
+                self.carregar_respostas()
+            )
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(respostas)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if (
+                self.pagina_respostas
+                >= total_paginas
+            ):
+                self.pagina_respostas = (
+                    total_paginas - 1
+                )
+
+            inicio = (
+                self.pagina_respostas
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            pagina = respostas[
+                inicio:fim
+            ]
+
+            if not pagina:
+                lista.add_widget(
+                    Label(
+                        text=(
+                            "Nenhuma resposta registrada."
+                        )
+                    )
+                )
+
+            for item in pagina:
+                botao = Button(
+                    text=(
+                        item.get(
+                            "discipulo_nome",
+                            ""
+                        )
+                        + " - "
+                        + item.get(
+                            "estudo_titulo",
+                            ""
+                        )
+                        + "\nRespondida"
+                    ),
+                    size_hint_y=None,
+                    height=dp(70)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, r=item:
+                    self.visualizar_resposta(
+                        r,
+                        atualizar
+                    )
+                )
+
+                lista.add_widget(botao)
+
+            titulo.text = (
+                "RESPOSTAS  "
+                + str(
+                    self.pagina_respostas + 1
+                )
+                + "/"
+                + str(total_paginas)
+                + "   Total: "
+                + str(len(respostas))
+            )
+
+        def voltar(*_):
+            if self.pagina_respostas > 0:
+                self.pagina_respostas -= 1
+                atualizar()
+
+        def avancar(*_):
+            respostas = (
+                self.carregar_respostas()
+            )
+
+            total_paginas = max(
+                1,
+                (
+                    len(respostas) + 3
+                ) // 4
+            )
+
+            if (
+                self.pagina_respostas + 1
+                < total_paginas
+            ):
+                self.pagina_respostas += 1
+                atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        nova.bind(
+            on_release=lambda *_:
+            self.nova_resposta(
+                atualizar
+            )
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar()
+        popup.open()
+
+    def nova_resposta(self, ao_salvar):
+        selecao = {
+            "discipulo": None,
+            "questao": None,
+        }
+
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6),
+            padding=dp(10)
+        )
+
+        discipulo_texto = TextInput(
+            hint_text="Escolha o discípulo",
+            readonly=True,
+            multiline=False,
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        escolher_discipulo = Button(
+            text="ESCOLHER DISCÍPULO",
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        questao_texto = TextInput(
+            hint_text="Escolha a questão",
+            readonly=True,
+            multiline=False,
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        escolher_questao = Button(
+            text="ESCOLHER QUESTÃO",
+            size_hint_y=None,
+            height=dp(46)
+        )
+
+        resposta = TextInput(
+            hint_text="Resposta do discípulo",
+            multiline=True,
+            size_hint_y=None,
+            height=dp(150)
+        )
+
+        caixa.add_widget(discipulo_texto)
+        caixa.add_widget(escolher_discipulo)
+        caixa.add_widget(questao_texto)
+        caixa.add_widget(escolher_questao)
+        caixa.add_widget(resposta)
+
+        aviso = Label(
+            text="",
+            size_hint_y=None,
+            height=dp(30)
+        )
+
+        caixa.add_widget(aviso)
+
+        botoes = BoxLayout(
+            spacing=dp(8),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        cancelar = Button(
+            text="CANCELAR"
+        )
+
+        salvar = Button(
+            text="SALVAR"
+        )
+
+        botoes.add_widget(cancelar)
+        botoes.add_widget(salvar)
+
+        caixa.add_widget(botoes)
+
+        popup = Popup(
+            title="Responder Questão",
+            content=caixa,
+            size_hint=(0.94, 0.94),
+            auto_dismiss=False
+        )
+
+        def carregar_existente():
+            discipulo = selecao[
+                "discipulo"
+            ]
+
+            questao = selecao[
+                "questao"
+            ]
+
+            if (
+                discipulo is None
+                or questao is None
+            ):
+                return
+
+            for item in self.carregar_respostas():
+                if (
+                    item.get(
+                        "discipulo_id"
+                    )
+                    == discipulo.get("id")
+                    and item.get(
+                        "questao_id"
+                    )
+                    == questao.get("id")
+                ):
+                    resposta.text = item.get(
+                        "resposta",
+                        ""
+                    )
+
+                    aviso.text = (
+                        "Resposta existente carregada."
+                    )
+                    return
+
+            resposta.text = ""
+            aviso.text = ""
+
+        def recebeu_discipulo(item):
+            selecao["discipulo"] = item
+
+            discipulo_texto.text = (
+                item.get(
+                    "nome",
+                    ""
+                )
+            )
+
+            carregar_existente()
+
+        def recebeu_questao(item):
+            selecao["questao"] = item
+
+            pergunta = item.get(
+                "pergunta",
+                ""
+            )
+
+            if len(pergunta) > 70:
+                pergunta = (
+                    pergunta[:67]
+                    + "..."
+                )
+
+            questao_texto.text = (
+                item.get(
+                    "estudo_titulo",
+                    ""
+                )
+                + " - "
+                + pergunta
+            )
+
+            carregar_existente()
+
+        escolher_discipulo.bind(
+            on_release=lambda *_:
+            self.escolher_discipulo_resposta(
+                recebeu_discipulo
+            )
+        )
+
+        escolher_questao.bind(
+            on_release=lambda *_:
+            self.escolher_questao_resposta(
+                recebeu_questao
+            )
+        )
+
+        cancelar.bind(
+            on_release=popup.dismiss
+        )
+
+        def confirmar(*_):
+            discipulo = selecao[
+                "discipulo"
+            ]
+
+            questao = selecao[
+                "questao"
+            ]
+
+            if discipulo is None:
+                aviso.text = (
+                    "Escolha o discípulo."
+                )
+                return
+
+            if questao is None:
+                aviso.text = (
+                    "Escolha a questão."
+                )
+                return
+
+            resposta_texto = (
+                resposta.text.strip()
+            )
+
+            if not resposta_texto:
+                aviso.text = (
+                    "Digite a resposta."
+                )
+                return
+
+            respostas = (
+                self.carregar_respostas()
+            )
+
+            existente = None
+
+            for item in respostas:
+                if (
+                    item.get(
+                        "discipulo_id"
+                    )
+                    == discipulo.get("id")
+                    and item.get(
+                        "questao_id"
+                    )
+                    == questao.get("id")
+                ):
+                    existente = item
+                    break
+
+            if existente is None:
+                respostas.append({
+                    "id":
+                        self.proximo_id_resposta(),
+
+                    "discipulo_id":
+                        discipulo.get("id"),
+
+                    "discipulo_nome":
+                        discipulo.get(
+                            "nome",
+                            ""
+                        ),
+
+                    "questao_id":
+                        questao.get("id"),
+
+                    "estudo_id":
+                        questao.get(
+                            "estudo_id"
+                        ),
+
+                    "estudo_titulo":
+                        questao.get(
+                            "estudo_titulo",
+                            ""
+                        ),
+
+                    "pergunta":
+                        questao.get(
+                            "pergunta",
+                            ""
+                        ),
+
+                    "resposta":
+                        resposta_texto,
+                })
+
+            else:
+                existente[
+                    "discipulo_nome"
+                ] = discipulo.get(
+                    "nome",
+                    ""
+                )
+
+                existente[
+                    "estudo_id"
+                ] = questao.get(
+                    "estudo_id"
+                )
+
+                existente[
+                    "estudo_titulo"
+                ] = questao.get(
+                    "estudo_titulo",
+                    ""
+                )
+
+                existente[
+                    "pergunta"
+                ] = questao.get(
+                    "pergunta",
+                    ""
+                )
+
+                existente[
+                    "resposta"
+                ] = resposta_texto
+
+            self.salvar_respostas(
+                respostas
+            )
+
+            popup.dismiss()
+
+            self.status.text = (
+                "Resposta salva."
+            )
+
+            ao_salvar()
+
+        salvar.bind(
+            on_release=confirmar
+        )
+
+        popup.open()
+
+    def visualizar_resposta(
+        self,
+        resposta,
+        ao_atualizar
+    ):
+        paginas = (
+            self.paginar_texto_estudo(
+                resposta.get(
+                    "resposta",
+                    ""
+                ),
+                limite=550
+            )
+        )
+
+        pagina = {
+            "numero": 0
+        }
+
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    resposta.get(
+                        "discipulo_nome",
+                        ""
+                    )
+                    + " - "
+                    + resposta.get(
+                        "estudo_titulo",
+                        ""
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(42),
+                font_size="17sp"
+            )
+        )
+
+        pergunta = resposta.get(
+            "pergunta",
+            ""
+        )
+
+        if len(pergunta) > 180:
+            pergunta = (
+                pergunta[:177]
+                + "..."
+            )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Questão:\n"
+                    + pergunta
+                ),
+                size_hint_y=None,
+                height=dp(85)
+            )
+        )
+
+        texto_resposta = Label(
+            text="",
+            halign="left",
+            valign="top"
+        )
+
+        texto_resposta.bind(
+            size=lambda inst, valor:
+            setattr(
+                inst,
+                "text_size",
+                (
+                    valor[0],
+                    valor[1]
+                )
+            )
+        )
+
+        caixa.add_widget(
+            texto_resposta
+        )
+
+        indicador = Label(
+            text="",
+            size_hint_y=None,
+            height=dp(30)
+        )
+
+        caixa.add_widget(
+            indicador
+        )
+
+        navegacao = BoxLayout(
+            spacing=dp(7),
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        proximo = Button(
+            text="PRÓXIMA"
+        )
+
+        navegacao.add_widget(anterior)
+        navegacao.add_widget(proximo)
+
+        caixa.add_widget(navegacao)
+
+        fechar = Button(
+            text="FECHAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(fechar)
+
+        popup = Popup(
+            title="Resposta",
+            content=caixa,
+            size_hint=(0.94, 0.92),
+            auto_dismiss=False
+        )
+
+        def atualizar_pagina():
+            texto_resposta.text = paginas[
+                pagina["numero"]
+            ]
+
+            indicador.text = (
+                "Página "
+                + str(
+                    pagina["numero"] + 1
+                )
+                + " de "
+                + str(len(paginas))
+            )
+
+        def voltar(*_):
+            if pagina["numero"] > 0:
+                pagina["numero"] -= 1
+                atualizar_pagina()
+
+        def avancar(*_):
+            if (
+                pagina["numero"] + 1
+                < len(paginas)
+            ):
+                pagina["numero"] += 1
+                atualizar_pagina()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar_pagina()
+        popup.open()
+
+    def carregar_questoes(self):
+        if not self.arquivo_questoes.exists():
+            return []
+
+        try:
+            dados = json.loads(
+                self.arquivo_questoes.read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            if isinstance(dados, list):
+                return dados
+
+        except Exception:
+            pass
+
+        return []
+
+    def salvar_questoes(self, questoes):
+        self.arquivo_questoes.write_text(
+            json.dumps(
+                questoes,
+                ensure_ascii=False,
+                indent=2
+            ),
+            encoding="utf-8"
+        )
+
+    def proximo_id_questao(self):
+        questoes = self.carregar_questoes()
+
+        ids = []
+
+        for item in questoes:
+            try:
+                ids.append(
+                    int(
+                        item.get(
+                            "id",
+                            0
+                        )
+                    )
+                )
+            except Exception:
+                pass
+
+        return max(
+            ids,
+            default=0
+        ) + 1
+
+    def escolher_estudo_questao(
+        self,
+        ao_escolher
+    ):
+        estudos = [
+            estudo
+            for estudo in self.carregar_estudos()
+            if estudo.get(
+                "status",
+                "Ativo"
+            ) == "Ativo"
+        ]
+
+        if not estudos:
+            self.status.text = (
+                "Nenhum estudo ativo cadastrado."
+            )
+            return
+
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text="ESCOLHER ESTUDO",
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(titulo)
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(lista)
+
+        navegacao = BoxLayout(
+            spacing=dp(7),
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(anterior)
+        navegacao.add_widget(proximo)
+
+        caixa.add_widget(navegacao)
+
+        cancelar = Button(
+            text="CANCELAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(cancelar)
+
+        popup = Popup(
+            title="Estudo",
+            content=caixa,
+            size_hint=(0.92, 0.86),
+            auto_dismiss=False
+        )
+
+        pagina = {
+            "numero": 0
+        }
+
+        def selecionar(estudo):
+            ao_escolher(estudo)
+            popup.dismiss()
+
+        def atualizar():
+            lista.clear_widgets()
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(estudos)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if pagina["numero"] >= total_paginas:
+                pagina["numero"] = (
+                    total_paginas - 1
+                )
+
+            inicio = (
+                pagina["numero"]
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            for estudo in estudos[
+                inicio:fim
+            ]:
+                botao = Button(
+                    text=(
+                        estudo.get(
+                            "titulo",
+                            ""
+                        )
+                        + "\n"
+                        + estudo.get(
+                            "referencia",
+                            ""
+                        )
+                    ),
+                    size_hint_y=None,
+                    height=dp(65)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, e=estudo:
+                    selecionar(e)
+                )
+
+                lista.add_widget(botao)
+
+            titulo.text = (
+                "ESCOLHER ESTUDO  "
+                + str(
+                    pagina["numero"] + 1
+                )
+                + "/"
+                + str(total_paginas)
+            )
+
+        def voltar(*_):
+            if pagina["numero"] > 0:
+                pagina["numero"] -= 1
+                atualizar()
+
+        def avancar(*_):
+            total_paginas = max(
+                1,
+                (
+                    len(estudos) + 3
+                ) // 4
+            )
+
+            if (
+                pagina["numero"] + 1
+                < total_paginas
+            ):
+                pagina["numero"] += 1
+                atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        cancelar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar()
+        popup.open()
+
+    def abrir_questoes(self):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text="QUESTÕES",
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(titulo)
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(lista)
+
+        navegacao = BoxLayout(
+            spacing=dp(6),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        nova = Button(
+            text="NOVA"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(anterior)
+        navegacao.add_widget(nova)
+        navegacao.add_widget(proximo)
+
+        caixa.add_widget(navegacao)
+
+        fechar = Button(
+            text="FECHAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(fechar)
+
+        popup = Popup(
+            title="Questões",
+            content=caixa,
+            size_hint=(0.96, 0.92),
+            auto_dismiss=False
+        )
+
+        def atualizar():
+            lista.clear_widgets()
+
+            questoes = (
+                self.carregar_questoes()
+            )
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(questoes)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if (
+                self.pagina_questoes
+                >= total_paginas
+            ):
+                self.pagina_questoes = (
+                    total_paginas - 1
+                )
+
+            inicio = (
+                self.pagina_questoes
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            pagina = questoes[
+                inicio:fim
+            ]
+
+            if not pagina:
+                lista.add_widget(
+                    Label(
+                        text=(
+                            "Nenhuma questão cadastrada."
+                        )
+                    )
+                )
+
+            for item in pagina:
+                pergunta = item.get(
+                    "pergunta",
+                    ""
+                )
+
+                if len(pergunta) > 90:
+                    pergunta = (
+                        pergunta[:87]
+                        + "..."
+                    )
+
+                botao = Button(
+                    text=(
+                        item.get(
+                            "estudo_titulo",
+                            ""
+                        )
+                        + "\n"
+                        + pergunta
+                    ),
+                    size_hint_y=None,
+                    height=dp(72)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, q=item:
+                    self.visualizar_questao(
+                        q,
+                        atualizar
+                    )
+                )
+
+                lista.add_widget(botao)
+
+            titulo.text = (
+                "QUESTÕES  "
+                + str(
+                    self.pagina_questoes + 1
+                )
+                + "/"
+                + str(total_paginas)
+                + "   Total: "
+                + str(len(questoes))
+            )
+
+        def voltar(*_):
+            if self.pagina_questoes > 0:
+                self.pagina_questoes -= 1
+                atualizar()
+
+        def avancar(*_):
+            questoes = (
+                self.carregar_questoes()
+            )
+
+            total_paginas = max(
+                1,
+                (
+                    len(questoes) + 3
+                ) // 4
+            )
+
+            if (
+                self.pagina_questoes + 1
+                < total_paginas
+            ):
+                self.pagina_questoes += 1
+                atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        nova.bind(
+            on_release=lambda *_:
+            self.nova_questao(
+                atualizar
+            )
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar()
+        popup.open()
+
+    def nova_questao(self, ao_salvar):
+        selecionado = {
+            "estudo": None
+        }
+
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        estudo = TextInput(
+            hint_text="Escolha o estudo",
+            readonly=True,
+            multiline=False,
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        escolher = Button(
+            text="ESCOLHER ESTUDO",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        pergunta = TextInput(
+            hint_text="Digite a questão",
+            multiline=True,
+            size_hint_y=None,
+            height=dp(150)
+        )
+
+        caixa.add_widget(estudo)
+        caixa.add_widget(escolher)
+        caixa.add_widget(pergunta)
+
+        aviso = Label(
+            text="",
+            size_hint_y=None,
+            height=dp(32)
+        )
+
+        caixa.add_widget(aviso)
+
+        botoes = BoxLayout(
+            spacing=dp(8),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        cancelar = Button(
+            text="CANCELAR"
+        )
+
+        salvar = Button(
+            text="SALVAR"
+        )
+
+        botoes.add_widget(cancelar)
+        botoes.add_widget(salvar)
+
+        caixa.add_widget(botoes)
+
+        popup = Popup(
+            title="Nova Questão",
+            content=caixa,
+            size_hint=(0.94, 0.86),
+            auto_dismiss=False
+        )
+
+        def recebeu_estudo(item):
+            selecionado["estudo"] = item
+
+            estudo.text = item.get(
+                "titulo",
+                ""
+            )
+
+        escolher.bind(
+            on_release=lambda *_:
+            self.escolher_estudo_questao(
+                recebeu_estudo
+            )
+        )
+
+        cancelar.bind(
+            on_release=popup.dismiss
+        )
+
+        def confirmar(*_):
+            estudo_item = selecionado[
+                "estudo"
+            ]
+
+            if estudo_item is None:
+                aviso.text = (
+                    "Escolha o estudo."
+                )
+                return
+
+            pergunta_texto = (
+                pergunta.text.strip()
+            )
+
+            if not pergunta_texto:
+                aviso.text = (
+                    "Digite a questão."
+                )
+                return
+
+            questoes = (
+                self.carregar_questoes()
+            )
+
+            questoes.append({
+                "id":
+                    self.proximo_id_questao(),
+
+                "estudo_id":
+                    estudo_item.get(
+                        "id"
+                    ),
+
+                "estudo_titulo":
+                    estudo_item.get(
+                        "titulo",
+                        ""
+                    ),
+
+                "pergunta":
+                    pergunta_texto,
+
+                "status":
+                    "Ativa",
+            })
+
+            self.salvar_questoes(
+                questoes
+            )
+
+            popup.dismiss()
+
+            self.status.text = (
+                "Questão salva."
+            )
+
+            ao_salvar()
+
+        salvar.bind(
+            on_release=confirmar
+        )
+
+        popup.open()
+
+    def visualizar_questao(
+        self,
+        questao,
+        ao_atualizar
+    ):
+        paginas = (
+            self.paginar_texto_estudo(
+                questao.get(
+                    "pergunta",
+                    ""
+                ),
+                limite=500
+            )
+        )
+
+        pagina = {
+            "numero": 0
+        }
+
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(8),
+            padding=dp(12)
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Estudo: "
+                    + questao.get(
+                        "estudo_titulo",
+                        ""
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(42)
+            )
+        )
+
+        pergunta = Label(
+            text="",
+            halign="left",
+            valign="top"
+        )
+
+        pergunta.bind(
+            size=lambda inst, valor:
+            setattr(
+                inst,
+                "text_size",
+                (
+                    valor[0],
+                    valor[1]
+                )
+            )
+        )
+
+        caixa.add_widget(pergunta)
+
+        indicador = Label(
+            text="",
+            size_hint_y=None,
+            height=dp(30)
+        )
+
+        caixa.add_widget(indicador)
+
+        navegacao = BoxLayout(
+            spacing=dp(7),
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        proximo = Button(
+            text="PRÓXIMA"
+        )
+
+        navegacao.add_widget(anterior)
+        navegacao.add_widget(proximo)
+
+        caixa.add_widget(navegacao)
+
+        botoes = BoxLayout(
+            spacing=dp(7),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        status_btn = Button(
+            text=(
+                "ARQUIVAR"
+                if questao.get(
+                    "status",
+                    "Ativa"
+                ) == "Ativa"
+                else "REATIVAR"
+            )
+        )
+
+        fechar = Button(
+            text="FECHAR"
+        )
+
+        botoes.add_widget(status_btn)
+        botoes.add_widget(fechar)
+
+        caixa.add_widget(botoes)
+
+        popup = Popup(
+            title="Questão",
+            content=caixa,
+            size_hint=(0.94, 0.88),
+            auto_dismiss=False
+        )
+
+        def atualizar_pagina():
+            pergunta.text = paginas[
+                pagina["numero"]
+            ]
+
+            indicador.text = (
+                "Página "
+                + str(
+                    pagina["numero"] + 1
+                )
+                + " de "
+                + str(len(paginas))
+            )
+
+        def voltar(*_):
+            if pagina["numero"] > 0:
+                pagina["numero"] -= 1
+                atualizar_pagina()
+
+        def avancar(*_):
+            if (
+                pagina["numero"] + 1
+                < len(paginas)
+            ):
+                pagina["numero"] += 1
+                atualizar_pagina()
+
+        def alternar(*_):
+            questoes = (
+                self.carregar_questoes()
+            )
+
+            id_alvo = questao.get("id")
+
+            for item in questoes:
+                if item.get("id") == id_alvo:
+                    item["status"] = (
+                        "Arquivada"
+                        if item.get(
+                            "status",
+                            "Ativa"
+                        ) == "Ativa"
+                        else "Ativa"
+                    )
+
+                    questao["status"] = (
+                        item["status"]
+                    )
+
+                    break
+
+            self.salvar_questoes(
+                questoes
+            )
+
+            popup.dismiss()
+            ao_atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        status_btn.bind(
+            on_release=alternar
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar_pagina()
+        popup.open()
+
+    def carregar_estudos(self):
+        if not self.arquivo_estudos.exists():
+            return []
+
+        try:
+            dados = json.loads(
+                self.arquivo_estudos.read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            if isinstance(dados, list):
+                return dados
+
+        except Exception:
+            pass
+
+        return []
+
+    def salvar_estudos(self, estudos):
+        self.arquivo_estudos.write_text(
+            json.dumps(
+                estudos,
+                ensure_ascii=False,
+                indent=2
+            ),
+            encoding="utf-8"
+        )
+
+    def proximo_id_estudo(self):
+        estudos = self.carregar_estudos()
+
+        ids = []
+
+        for item in estudos:
+            try:
+                ids.append(
+                    int(
+                        item.get(
+                            "id",
+                            0
+                        )
+                    )
+                )
+            except Exception:
+                pass
+
+        return max(
+            ids,
+            default=0
+        ) + 1
+
+    def paginar_texto_estudo(
+        self,
+        texto,
+        limite=650
+    ):
+        texto = (
+            texto
+            or ""
+        ).strip()
+
+        if not texto:
+            return [
+                "Nenhum conteúdo cadastrado."
+            ]
+
+        palavras = texto.split()
+
+        paginas = []
+        atual = []
+
+        tamanho = 0
+
+        for palavra in palavras:
+            adicional = (
+                len(palavra)
+                + (
+                    1
+                    if atual
+                    else 0
+                )
+            )
+
+            if (
+                atual
+                and tamanho + adicional
+                > limite
+            ):
+                paginas.append(
+                    " ".join(atual)
+                )
+
+                atual = [
+                    palavra
+                ]
+
+                tamanho = len(
+                    palavra
+                )
+
+            else:
+                atual.append(
+                    palavra
+                )
+
+                tamanho += adicional
+
+        if atual:
+            paginas.append(
+                " ".join(atual)
+            )
+
+        return (
+            paginas
+            or [
+                "Nenhum conteúdo cadastrado."
+            ]
+        )
+
+    def abrir_estudos(self):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text="ESTUDOS",
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(
+            titulo
+        )
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(
+            lista
+        )
+
+        navegacao = BoxLayout(
+            spacing=dp(6),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        novo = Button(
+            text="NOVO"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(
+            anterior
+        )
+
+        navegacao.add_widget(
+            novo
+        )
+
+        navegacao.add_widget(
+            proximo
+        )
+
+        caixa.add_widget(
+            navegacao
+        )
+
+        fechar = Button(
+            text="FECHAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(
+            fechar
+        )
+
+        popup = Popup(
+            title="Estudos",
+            content=caixa,
+            size_hint=(0.96, 0.92),
+            auto_dismiss=False
+        )
+
+        def atualizar():
+            lista.clear_widgets()
+
+            estudos = (
+                self.carregar_estudos()
+            )
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(estudos)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if (
+                self.pagina_estudos
+                >= total_paginas
+            ):
+                self.pagina_estudos = (
+                    total_paginas - 1
+                )
+
+            inicio = (
+                self.pagina_estudos
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            pagina = estudos[
+                inicio:fim
+            ]
+
+            if not pagina:
+                lista.add_widget(
+                    Label(
+                        text=(
+                            "Nenhum estudo cadastrado."
+                        )
+                    )
+                )
+
+            for item in pagina:
+                botao = Button(
+                    text=(
+                        item.get(
+                            "titulo",
+                            ""
+                        )
+                        + " - "
+                        + item.get(
+                            "status",
+                            "Ativo"
+                        )
+                        + "\n"
+                        + item.get(
+                            "referencia",
+                            ""
+                        )
+                    ),
+                    size_hint_y=None,
+                    height=dp(65)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, e=item:
+                    self.visualizar_estudo(
+                        e,
+                        atualizar
+                    )
+                )
+
+                lista.add_widget(
+                    botao
+                )
+
+            titulo.text = (
+                "ESTUDOS  "
+                + str(
+                    self.pagina_estudos + 1
+                )
+                + "/"
+                + str(total_paginas)
+                + "   Total: "
+                + str(
+                    len(estudos)
+                )
+            )
+
+        def voltar(*_):
+            if self.pagina_estudos > 0:
+                self.pagina_estudos -= 1
+                atualizar()
+
+        def avancar(*_):
+            estudos = (
+                self.carregar_estudos()
+            )
+
+            total_paginas = max(
+                1,
+                (
+                    len(estudos) + 3
+                ) // 4
+            )
+
+            if (
+                self.pagina_estudos + 1
+                < total_paginas
+            ):
+                self.pagina_estudos += 1
+                atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        novo.bind(
+            on_release=lambda *_:
+            self.novo_estudo(
+                atualizar
+            )
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar()
+        popup.open()
+
+    def novo_estudo(self, ao_salvar):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6),
+            padding=dp(10)
+        )
+
+        titulo = TextInput(
+            hint_text="Título do estudo",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        referencia = TextInput(
+            hint_text="Referência",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        conteudo = TextInput(
+            hint_text="Conteúdo do estudo",
+            multiline=True,
+            size_hint_y=None,
+            height=dp(180)
+        )
+
+        caixa.add_widget(
+            titulo
+        )
+
+        caixa.add_widget(
+            referencia
+        )
+
+        caixa.add_widget(
+            conteudo
+        )
+
+        aviso = Label(
+            text="",
+            size_hint_y=None,
+            height=dp(30)
+        )
+
+        caixa.add_widget(
+            aviso
+        )
+
+        botoes = BoxLayout(
+            spacing=dp(8),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        cancelar = Button(
+            text="CANCELAR"
+        )
+
+        salvar = Button(
+            text="SALVAR"
+        )
+
+        botoes.add_widget(
+            cancelar
+        )
+
+        botoes.add_widget(
+            salvar
+        )
+
+        caixa.add_widget(
+            botoes
+        )
+
+        popup = Popup(
+            title="Novo Estudo",
+            content=caixa,
+            size_hint=(0.94, 0.90),
+            auto_dismiss=False
+        )
+
+        cancelar.bind(
+            on_release=popup.dismiss
+        )
+
+        def confirmar(*_):
+            titulo_texto = (
+                titulo.text.strip()
+            )
+
+            if not titulo_texto:
+                aviso.text = (
+                    "Digite o título do estudo."
+                )
+                return
+
+            estudos = (
+                self.carregar_estudos()
+            )
+
+            estudos.append({
+                "id":
+                    self.proximo_id_estudo(),
+
+                "titulo":
+                    titulo_texto,
+
+                "referencia":
+                    referencia.text.strip(),
+
+                "conteudo":
+                    conteudo.text.strip(),
+
+                "status":
+                    "Ativo",
+            })
+
+            self.salvar_estudos(
+                estudos
+            )
+
+            popup.dismiss()
+
+            self.status.text = (
+                "Estudo salvo: "
+                + titulo_texto
+            )
+
+            ao_salvar()
+
+        salvar.bind(
+            on_release=confirmar
+        )
+
+        popup.open()
+
+    def visualizar_estudo(
+        self,
+        estudo,
+        ao_atualizar
+    ):
+        paginas = (
+            self.paginar_texto_estudo(
+                estudo.get(
+                    "conteudo",
+                    ""
+                )
+            )
+        )
+
+        pagina = {
+            "numero": 0
+        }
+
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text=estudo.get(
+                "titulo",
+                ""
+            ),
+            size_hint_y=None,
+            height=dp(42),
+            font_size="18sp"
+        )
+
+        referencia = Label(
+            text=(
+                "Referência: "
+                + estudo.get(
+                    "referencia",
+                    ""
+                )
+            ),
+            size_hint_y=None,
+            height=dp(35)
+        )
+
+        conteudo = Label(
+            text="",
+            halign="left",
+            valign="top"
+        )
+
+        conteudo.bind(
+            size=lambda inst, valor:
+            setattr(
+                inst,
+                "text_size",
+                (
+                    valor[0],
+                    valor[1]
+                )
+            )
+        )
+
+        pagina_label = Label(
+            text="",
+            size_hint_y=None,
+            height=dp(30)
+        )
+
+        caixa.add_widget(
+            titulo
+        )
+
+        caixa.add_widget(
+            referencia
+        )
+
+        caixa.add_widget(
+            conteudo
+        )
+
+        caixa.add_widget(
+            pagina_label
+        )
+
+        navegacao = BoxLayout(
+            spacing=dp(7),
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        proximo = Button(
+            text="PRÓXIMA"
+        )
+
+        navegacao.add_widget(
+            anterior
+        )
+
+        navegacao.add_widget(
+            proximo
+        )
+
+        caixa.add_widget(
+            navegacao
+        )
+
+        botoes = BoxLayout(
+            spacing=dp(7),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        status_btn = Button(
+            text=(
+                "ARQUIVAR"
+                if estudo.get(
+                    "status",
+                    "Ativo"
+                ) == "Ativo"
+                else "REATIVAR"
+            )
+        )
+
+        fechar = Button(
+            text="FECHAR"
+        )
+
+        botoes.add_widget(
+            status_btn
+        )
+
+        botoes.add_widget(
+            fechar
+        )
+
+        caixa.add_widget(
+            botoes
+        )
+
+        popup = Popup(
+            title="Estudo",
+            content=caixa,
+            size_hint=(0.94, 0.92),
+            auto_dismiss=False
+        )
+
+        def atualizar_pagina():
+            conteudo.text = paginas[
+                pagina["numero"]
+            ]
+
+            pagina_label.text = (
+                "Página "
+                + str(
+                    pagina["numero"] + 1
+                )
+                + " de "
+                + str(
+                    len(paginas)
+                )
+            )
+
+        def voltar(*_):
+            if pagina["numero"] > 0:
+                pagina["numero"] -= 1
+                atualizar_pagina()
+
+        def avancar(*_):
+            if (
+                pagina["numero"] + 1
+                < len(paginas)
+            ):
+                pagina["numero"] += 1
+                atualizar_pagina()
+
+        def alternar_status(*_):
+            estudos = (
+                self.carregar_estudos()
+            )
+
+            id_alvo = estudo.get(
+                "id"
+            )
+
+            for item in estudos:
+                if item.get("id") == id_alvo:
+                    item["status"] = (
+                        "Arquivado"
+                        if item.get(
+                            "status",
+                            "Ativo"
+                        ) == "Ativo"
+                        else "Ativo"
+                    )
+
+                    estudo["status"] = (
+                        item["status"]
+                    )
+
+                    break
+
+            self.salvar_estudos(
+                estudos
+            )
+
+            popup.dismiss()
+            ao_atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        status_btn.bind(
+            on_release=alternar_status
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar_pagina()
+        popup.open()
+
+    def carregar_discipulos(self):
+        if not self.arquivo_discipulos.exists():
+            return []
+
+        try:
+            dados = json.loads(
+                self.arquivo_discipulos.read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            if isinstance(dados, list):
+                return dados
+
+        except Exception:
+            pass
+
+        return []
+
+    def salvar_discipulos(self, discipulos):
+        self.arquivo_discipulos.write_text(
+            json.dumps(
+                discipulos,
+                ensure_ascii=False,
+                indent=2
+            ),
+            encoding="utf-8"
+        )
+
+    def proximo_id_discipulo(self):
+        discipulos = self.carregar_discipulos()
+
+        ids = []
+
+        for item in discipulos:
+            try:
+                ids.append(
+                    int(
+                        item.get(
+                            "id",
+                            0
+                        )
+                    )
+                )
+            except Exception:
+                pass
+
+        return max(
+            ids,
+            default=0
+        ) + 1
+
+    def abrir_discipulos(self):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(7),
+            padding=dp(10)
+        )
+
+        titulo = Label(
+            text="DISCÍPULOS",
+            size_hint_y=None,
+            height=dp(38),
+            font_size="18sp"
+        )
+
+        caixa.add_widget(
+            titulo
+        )
+
+        lista = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6)
+        )
+
+        caixa.add_widget(
+            lista
+        )
+
+        navegacao = BoxLayout(
+            spacing=dp(6),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        anterior = Button(
+            text="ANTERIOR"
+        )
+
+        novo = Button(
+            text="NOVO"
+        )
+
+        proximo = Button(
+            text="PRÓXIMO"
+        )
+
+        navegacao.add_widget(
+            anterior
+        )
+
+        navegacao.add_widget(
+            novo
+        )
+
+        navegacao.add_widget(
+            proximo
+        )
+
+        caixa.add_widget(
+            navegacao
+        )
+
+        fechar = Button(
+            text="FECHAR",
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        caixa.add_widget(
+            fechar
+        )
+
+        popup = Popup(
+            title="Discípulos",
+            content=caixa,
+            size_hint=(0.96, 0.92),
+            auto_dismiss=False
+        )
+
+        def atualizar():
+            lista.clear_widgets()
+
+            discipulos = (
+                self.carregar_discipulos()
+            )
+
+            por_pagina = 4
+
+            total_paginas = max(
+                1,
+                (
+                    len(discipulos)
+                    + por_pagina - 1
+                ) // por_pagina
+            )
+
+            if (
+                self.pagina_discipulos
+                >= total_paginas
+            ):
+                self.pagina_discipulos = (
+                    total_paginas - 1
+                )
+
+            inicio = (
+                self.pagina_discipulos
+                * por_pagina
+            )
+
+            fim = inicio + por_pagina
+
+            pagina = discipulos[
+                inicio:fim
+            ]
+
+            if not pagina:
+                lista.add_widget(
+                    Label(
+                        text=(
+                            "Nenhum discípulo cadastrado."
+                        )
+                    )
+                )
+
+            for item in pagina:
+                botao = Button(
+                    text=(
+                        item.get(
+                            "nome",
+                            ""
+                        )
+                        + " - "
+                        + item.get(
+                            "situacao",
+                            "Ativo"
+                        )
+                        + "\n"
+                        + item.get(
+                            "contato",
+                            ""
+                        )
+                    ),
+                    size_hint_y=None,
+                    height=dp(65)
+                )
+
+                botao.bind(
+                    on_release=lambda _b, d=item:
+                    self.visualizar_discipulo(
+                        d,
+                        atualizar
+                    )
+                )
+
+                lista.add_widget(
+                    botao
+                )
+
+            titulo.text = (
+                "DISCÍPULOS  "
+                + str(
+                    self.pagina_discipulos + 1
+                )
+                + "/"
+                + str(total_paginas)
+                + "   Total: "
+                + str(
+                    len(discipulos)
+                )
+            )
+
+        def voltar(*_):
+            if self.pagina_discipulos > 0:
+                self.pagina_discipulos -= 1
+                atualizar()
+
+        def avancar(*_):
+            discipulos = (
+                self.carregar_discipulos()
+            )
+
+            total_paginas = max(
+                1,
+                (
+                    len(discipulos) + 3
+                ) // 4
+            )
+
+            if (
+                self.pagina_discipulos + 1
+                < total_paginas
+            ):
+                self.pagina_discipulos += 1
+                atualizar()
+
+        anterior.bind(
+            on_release=voltar
+        )
+
+        proximo.bind(
+            on_release=avancar
+        )
+
+        novo.bind(
+            on_release=lambda *_:
+            self.novo_discipulo(
+                atualizar
+            )
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        atualizar()
+        popup.open()
+
+    def novo_discipulo(self, ao_salvar):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(6),
+            padding=dp(10)
+        )
+
+        nome = TextInput(
+            hint_text="Nome",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        contato = TextInput(
+            hint_text="Contato",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        entrada = TextInput(
+            hint_text="Data de entrada",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(48)
+        )
+
+        observacoes = TextInput(
+            hint_text="Observações",
+            multiline=True,
+            size_hint_y=None,
+            height=dp(90)
+        )
+
+        caixa.add_widget(nome)
+        caixa.add_widget(contato)
+        caixa.add_widget(entrada)
+        caixa.add_widget(observacoes)
+
+        aviso = Label(
+            text="",
+            size_hint_y=None,
+            height=dp(30)
+        )
+
+        caixa.add_widget(
+            aviso
+        )
+
+        botoes = BoxLayout(
+            spacing=dp(8),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        cancelar = Button(
+            text="CANCELAR"
+        )
+
+        salvar = Button(
+            text="SALVAR"
+        )
+
+        botoes.add_widget(
+            cancelar
+        )
+
+        botoes.add_widget(
+            salvar
+        )
+
+        caixa.add_widget(
+            botoes
+        )
+
+        popup = Popup(
+            title="Novo Discípulo",
+            content=caixa,
+            size_hint=(0.94, 0.88),
+            auto_dismiss=False
+        )
+
+        cancelar.bind(
+            on_release=popup.dismiss
+        )
+
+        def confirmar(*_):
+            nome_texto = (
+                nome.text.strip()
+            )
+
+            if not nome_texto:
+                aviso.text = (
+                    "Digite o nome."
+                )
+                return
+
+            discipulos = (
+                self.carregar_discipulos()
+            )
+
+            discipulos.append({
+                "id":
+                    self.proximo_id_discipulo(),
+
+                "nome":
+                    nome_texto,
+
+                "contato":
+                    contato.text.strip(),
+
+                "data_entrada":
+                    entrada.text.strip(),
+
+                "situacao":
+                    "Ativo",
+
+                "observacoes":
+                    observacoes.text.strip(),
+            })
+
+            self.salvar_discipulos(
+                discipulos
+            )
+
+            popup.dismiss()
+
+            self.status.text = (
+                "Discípulo salvo: "
+                + nome_texto
+            )
+
+            ao_salvar()
+
+        salvar.bind(
+            on_release=confirmar
+        )
+
+        popup.open()
+
+    def visualizar_discipulo(
+        self,
+        discipulo,
+        ao_atualizar
+    ):
+        caixa = BoxLayout(
+            orientation="vertical",
+            spacing=dp(8),
+            padding=dp(12)
+        )
+
+        caixa.add_widget(
+            Label(
+                text=discipulo.get(
+                    "nome",
+                    ""
+                ),
+                size_hint_y=None,
+                height=dp(45),
+                font_size="19sp"
+            )
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Contato: "
+                    + discipulo.get(
+                        "contato",
+                        ""
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(38)
+            )
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Entrada: "
+                    + discipulo.get(
+                        "data_entrada",
+                        ""
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(38)
+            )
+        )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Situação: "
+                    + discipulo.get(
+                        "situacao",
+                        "Ativo"
+                    )
+                ),
+                size_hint_y=None,
+                height=dp(38)
+            )
+        )
+
+        observacoes = discipulo.get(
+            "observacoes",
+            ""
+        )
+
+        if len(observacoes) > 180:
+            observacoes = (
+                observacoes[:177]
+                + "..."
+            )
+
+        caixa.add_widget(
+            Label(
+                text=(
+                    "Observações:\n"
+                    + observacoes
+                )
+            )
+        )
+
+        botoes = BoxLayout(
+            spacing=dp(8),
+            size_hint_y=None,
+            height=dp(50)
+        )
+
+        situacao = Button(
+            text=(
+                "DESATIVAR"
+                if discipulo.get(
+                    "situacao",
+                    "Ativo"
+                ) == "Ativo"
+                else "ATIVAR"
+            )
+        )
+
+        fechar = Button(
+            text="FECHAR"
+        )
+
+        botoes.add_widget(
+            situacao
+        )
+
+        botoes.add_widget(
+            fechar
+        )
+
+        caixa.add_widget(
+            botoes
+        )
+
+        popup = Popup(
+            title="Discípulo",
+            content=caixa,
+            size_hint=(0.92, 0.80),
+            auto_dismiss=False
+        )
+
+        def alternar(*_):
+            discipulos = (
+                self.carregar_discipulos()
+            )
+
+            id_alvo = discipulo.get(
+                "id"
+            )
+
+            for item in discipulos:
+                if item.get("id") == id_alvo:
+                    item["situacao"] = (
+                        "Inativo"
+                        if item.get(
+                            "situacao",
+                            "Ativo"
+                        ) == "Ativo"
+                        else "Ativo"
+                    )
+
+                    discipulo["situacao"] = (
+                        item["situacao"]
+                    )
+
+                    break
+
+            self.salvar_discipulos(
+                discipulos
+            )
+
+            popup.dismiss()
+            ao_atualizar()
+
+        situacao.bind(
+            on_release=alternar
+        )
+
+        fechar.bind(
+            on_release=popup.dismiss
+        )
+
+        popup.open()
+
+
+class AplicativoGerado(App):
+
+    def build(self):
+        self.title = NOME_APP
+        return DiscipuladoApp()
+
+
+if __name__ == "__main__":
+    AplicativoGerado().run()

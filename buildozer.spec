@@ -19,6 +19,8 @@ orientation = portrait
 
 fullscreen = 0
 
+icon.filename = Logoapk.png
+
 
 # ==========================================================
 # ANDROID
